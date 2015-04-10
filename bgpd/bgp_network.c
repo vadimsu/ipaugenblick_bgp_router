@@ -130,7 +130,8 @@ bgp_update_sock_send_buffer_size (int fd)
   int size = BGP_SOCKET_SNDBUF_SIZE;
   int optval;
   socklen_t optlen = sizeof(optval);
-
+#ifdef IPAUGENBLICK
+#else
   if (getsockopt(fd, SOL_SOCKET, SO_SNDBUF, &optval, &optlen) < 0)
     {
       zlog_err("getsockopt of SO_SNDBUF failed %s\n", safe_strerror(errno));
@@ -143,6 +144,7 @@ bgp_update_sock_send_buffer_size (int fd)
           zlog_err("Couldn't increase send buffer: %s\n", safe_strerror(errno));
         }
     }
+#endif
 }
 
 static void
@@ -150,7 +152,8 @@ bgp_set_socket_ttl (struct peer *peer, int bgp_sock)
 {
   char buf[INET_ADDRSTRLEN];
   int ret;
-
+#ifdef IPAUGENBLICK
+#else
   /* In case of peer is EBGP, we should set TTL for this connection.  */
   if (!peer->gtsm_hops && (peer_sort (peer) == BGP_PEER_EBGP))
     {
@@ -186,6 +189,7 @@ bgp_set_socket_ttl (struct peer *peer, int bgp_sock)
 		    errno);
 	}
     }
+#endif
 }
 
 /* Accept bgp connection. */
@@ -210,6 +214,10 @@ bgp_accept (struct thread *thread)
   listener->thread = thread_add_read (master, bgp_accept, listener, accept_sock);
 
   /* Accept client connection. */
+#ifdef IPAUGENBLICK
+  bgp_sock = ipaugenblick_accept(accept_sock,&su.sin.sin_addr.s_addr,&su.sin.sin_port);
+  su.sin.sin_family = AF_INET; /* for now only IPV4 */
+#else
   bgp_sock = sockunion_accept (accept_sock, &su);
   if (bgp_sock < 0)
     {
@@ -217,7 +225,7 @@ bgp_accept (struct thread *thread)
       return -1;
     }
   set_nonblocking (bgp_sock);
-
+#endif
   /* Set socket send buffer size */
   bgp_update_sock_send_buffer_size(bgp_sock);
 
@@ -237,7 +245,11 @@ bgp_accept (struct thread *thread)
 	    zlog_debug ("[Event] BGP connection IP address %s is Idle state",
 		       inet_sutop (&su, buf));
 	}
+#ifdef IPAUGENBLICK
+      ipaugenblick_close(bgp_sock);
+#else
       close (bgp_sock);
+#endif
       return -1;
     }
 
@@ -284,10 +296,11 @@ bgp_bind (struct peer *peer)
 
   if ( bgpd_privs.change (ZPRIVS_RAISE) )
   	zlog_err ("bgp_bind: could not raise privs");
-  
+#ifdef IPAUGENBLICK 
+#else
   ret = setsockopt (peer->fd, SOL_SOCKET, SO_BINDTODEVICE, 
 		    &ifreq, sizeof (ifreq));
-
+#endif
   if (bgpd_privs.change (ZPRIVS_LOWER) )
     zlog_err ("bgp_bind: could not lower privs");
 
@@ -349,13 +362,20 @@ bgp_update_source (struct peer *peer)
 
       if (bgp_update_address (ifp, &peer->su, &addr))
 	return;
-
+#ifdef IPAUGENBLICK
+      ipaugenblick_v4_connect_bind_socket(peer->fd,addr.sin.sin_addr.s_addr,addr.sin.sin_port,0);
+#else
       sockunion_bind (peer->fd, &addr, 0, &addr);
+#endif
     }
 
   /* Source is specified with IP address.  */
   if (peer->update_source)
+#ifdef IPAUGENBLICK
+    ipaugenblick_v4_connect_bind_socket(peer->fd,peer->update_source->sin.sin_addr.s_addr,peer->update_source->sin.sin_port,0);
+#else
     sockunion_bind (peer->fd, peer->update_source, 0, peer->update_source);
+#endif
 }
 
 /* BGP try to connect to the peer.  */
@@ -365,20 +385,25 @@ bgp_connect (struct peer *peer)
   unsigned int ifindex = 0;
 
   /* Make socket for the peer. */
+#ifdef IPAUGENBLICK
+  peer->fd = ipaugenblick_open_socket(AF_INET,SOCK_STREAM,-1);
+#else
   peer->fd = sockunion_socket (&peer->su);
+#endif
   if (peer->fd < 0)
     return -1;
-
+#ifdef IPAUGENBLICK
+#else
   set_nonblocking (peer->fd);
-
+#endif
   /* Set socket send buffer size */
   bgp_update_sock_send_buffer_size(peer->fd);
 
   bgp_set_socket_ttl (peer, peer->fd);
-
+#ifdef IPAUGENBLICK
+#else
   sockopt_reuseaddr (peer->fd);
-  sockopt_reuseport (peer->fd);
-  
+  sockopt_reuseport (peer->fd);  
 #ifdef IPTOS_PREC_INTERNETCONTROL
   if (bgpd_privs.change (ZPRIVS_RAISE))
     zlog_err ("%s: could not raise privs", __func__);
@@ -388,6 +413,7 @@ bgp_connect (struct peer *peer)
   else if (sockunion_family (&peer->su) == AF_INET6)
     setsockopt_ipv6_tclass (peer->fd, IPTOS_PREC_INTERNETCONTROL);
 # endif
+#endif /* IPAUGENBLICK */
   if (bgpd_privs.change (ZPRIVS_LOWER))
     zlog_err ("%s: could not lower privs", __func__);
 #endif
@@ -411,7 +437,11 @@ bgp_connect (struct peer *peer)
 	       peer->host, peer->host, peer->fd);
 
   /* Connect to the remote peer. */
+#ifdef IPAUGENBLICK
+  return ipaugenblick_v4_connect_bind_socket(peer->fd,peer->su.sin.sin_addr.s_addr,htons(peer->port),1);
+#else
   return sockunion_connect (peer->fd, &peer->su, htons (peer->port), ifindex);
+#endif
 }
 
 /* After TCP connection is established.  Get local address and port. */
@@ -429,10 +459,11 @@ bgp_getsockname (struct peer *peer)
       sockunion_free (peer->su_remote);
       peer->su_remote = NULL;
     }
-
+#ifdef IPAUGENBLICK
+#else
   peer->su_local = sockunion_getsockname (peer->fd);
   peer->su_remote = sockunion_getpeername (peer->fd);
-
+#endif
   bgp_nexthop_set (peer->su_local, peer->su_remote, &peer->nexthop, peer);
 }
 
@@ -442,13 +473,16 @@ bgp_listener (int sock, struct sockaddr *sa, socklen_t salen)
 {
   struct bgp_listener *listener;
   int ret, en;
-
+#ifdef IPAUGENBLICK
+#else
   sockopt_reuseaddr (sock);
   sockopt_reuseport (sock);
-
+#endif
   if (bgpd_privs.change (ZPRIVS_RAISE))
     zlog_err ("%s: could not raise privs", __func__);
-
+#ifdef IPAUGENBLICK
+   ipaugenblick_v4_connect_bind_socket(sock,((struct sockaddr_in *)sa)->sin_addr.s_addr,((struct sockaddr_in *)sa)->sin_port,0);
+#else
 #ifdef IPTOS_PREC_INTERNETCONTROL
   if (sa->sa_family == AF_INET)
     setsockopt_ipv4_tos (sock, IPTOS_PREC_INTERNETCONTROL);
@@ -461,6 +495,7 @@ bgp_listener (int sock, struct sockaddr *sa, socklen_t salen)
   sockopt_v6only (sa->sa_family, sock);
 
   ret = bind (sock, sa, salen);
+#endif
   en = errno;
   if (bgpd_privs.change (ZPRIVS_LOWER))
     zlog_err ("%s: could not lower privs", __func__);
@@ -470,8 +505,11 @@ bgp_listener (int sock, struct sockaddr *sa, socklen_t salen)
       zlog_err ("bind: %s", safe_strerror (en));
       return ret;
     }
-
+#ifdef IPAUGENBLICK
+  ret = ipaugenblick_listen_socket(sock);
+#else
   ret = listen (sock, 3);
+#endif
   if (ret < 0)
     {
       zlog_err ("listen: %s", safe_strerror (errno));
@@ -504,8 +542,10 @@ bgp_socket (unsigned short port, const char *address)
 
   snprintf (port_str, sizeof(port_str), "%d", port);
   port_str[sizeof (port_str) - 1] = '\0';
-
+#ifdef IPAUGENBLICK
+#else
   ret = getaddrinfo (address, port_str, &req, &ainfo_save);
+#endif
   if (ret != 0)
     {
       zlog_err ("getaddrinfo: %s", gai_strerror (ret));
@@ -519,8 +559,11 @@ bgp_socket (unsigned short port, const char *address)
 
       if (ainfo->ai_family != AF_INET && ainfo->ai_family != AF_INET6)
 	continue;
-     
+#ifdef IPAUGENBLICK
+  sock = ipaugenblick_open_socket(AF_INET,SOCK_STREAM,-1);
+#else    
       sock = socket (ainfo->ai_family, ainfo->ai_socktype, ainfo->ai_protocol);
+#endif
       if (sock < 0)
 	{
 	  zlog_err ("socket: %s", safe_strerror (errno));
@@ -528,13 +571,19 @@ bgp_socket (unsigned short port, const char *address)
 	}
 	
       /* if we intend to implement ttl-security, this socket needs ttl=255 */
+#ifdef IPAUGENBLICK
+#else
       sockopt_ttl (ainfo->ai_family, sock, MAXTTL);
-      
+#endif      
       ret = bgp_listener (sock, ainfo->ai_addr, ainfo->ai_addrlen);
       if (ret == 0)
 	++count;
       else
+#ifdef IPAUGENBLICK
+        ipaugenblick_close(sock);
+#else
 	close(sock);
+#endif
     }
   freeaddrinfo (ainfo_save);
   if (count == 0)
@@ -554,8 +603,11 @@ bgp_socket (unsigned short port, const char *address)
   int socklen;
   struct sockaddr_in sin;
   int ret, en;
-
+#ifdef IPAUGENBLICK
+  sock = ipaugenblick_open_socket(AF_INET,SOCK_STREAM,-1);
+#else
   sock = socket (AF_INET, SOCK_STREAM, 0);
+#endif
   if (sock < 0)
     {
       zlog_err ("socket: %s", safe_strerror (errno));
@@ -563,8 +615,10 @@ bgp_socket (unsigned short port, const char *address)
     }
 
   /* if we intend to implement ttl-security, this socket needs ttl=255 */
+#ifdef IPAUGENBLICK
+#else
   sockopt_ttl (AF_INET, sock, MAXTTL);
-
+#endif
   memset (&sin, 0, sizeof (struct sockaddr_in));
   sin.sin_family = AF_INET;
   sin.sin_port = htons (port);
@@ -583,7 +637,11 @@ bgp_socket (unsigned short port, const char *address)
   ret = bgp_listener (sock, (struct sockaddr *) &sin, socklen);
   if (ret < 0) 
     {
+#ifdef IPAUGENBLICK
+      ipaugenblick_close(sock);
+#else
       close (sock);
+#endif
       return ret;
     }
   return sock;
@@ -599,7 +657,11 @@ bgp_close (void)
   for (ALL_LIST_ELEMENTS (bm->listen_sockets, node, next, listener))
     {
       thread_cancel (listener->thread);
+#ifdef IPAUGENBLICK
+      ipaugenblick_close(sock);
+#else      
       close (listener->fd);
+#endif
       listnode_delete (bm->listen_sockets, listener);
       XFREE (MTYPE_BGP_LISTENER, listener);
     }
