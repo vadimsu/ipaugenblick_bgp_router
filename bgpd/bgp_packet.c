@@ -47,6 +47,9 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 #include "bgpd/bgp_mplsvpn.h"
 #include "bgpd/bgp_advertise.h"
 #include "bgpd/bgp_vty.h"
+#ifdef HAVE_IPAUGENBLICK
+#include <ipaugenblick_api.h>
+#endif
 
 int stream_put_prefix (struct stream *, struct prefix *);
 
@@ -729,11 +732,11 @@ bgp_write (struct thread *thread)
 			int offsets[bufnum];
 			int lengths[bufnum];
 			num = 0;
-			remained = writenum;
+			int remained = writenum;
 	    		for(bufidx = 0;bufidx < bufnum;bufidx++) 
 			  {
 				num = remained > 1448 ? 1448 : remained;
-				offset[bufidx] = 0;
+				offsets[bufidx] = 0;
 				lengths[bufidx] = num;
 				memcpy(bufs[bufidx],STREAM_PNT(s),num);
 				stream_forward_getp (s, num);
@@ -859,12 +862,12 @@ bgp_write_notify (struct peer *peer)
 	      {
 			int offsets[bufnum];
 			int lengths[bufnum];
-			num = 0;
-			remained = writenum;
+			int num = 0;
+			int remained = writenum;
 	    		for(bufidx = 0;bufidx < bufnum;bufidx++) 
 			  {
 				num = remained > 1448 ? 1448 : remained;
-				offset[bufidx] = 0;
+				offsets[bufidx] = 0;
 				lengths[bufidx] = num;
 				memcpy(bufs[bufidx],STREAM_DATA (s),num);
 				stream_forward_getp (s, num);
@@ -2483,18 +2486,19 @@ bgp_read_packet (struct peer *peer)
 	int len = readsize,bufidx;
 	void *rxbuff;
 	int offset = 0;
-	if(!ipaugenblick_receive(peer->fd,&rxbuff,&len,&bufnum))
+	int buflen = 0;
+	if(!ipaugenblick_receive(peer->fd,&rxbuff,&len,&bufnum,&buflen))
 	  {
 		void *buff = rxbuff;
 		for(bufidx = 0;bufidx < bufnum;bufidx++)
 	  	{ 
                     if((buff)&&(len > 0)) /* API must be changed to return first segment's length!!! */
 		      {
-                        memcpy(&peer->ibuf[offset],bufs[bufidx],len);
-			offset += len;
+                        memcpy(&peer->ibuf[offset],buff,buflen);
+			offset += buflen;
                         /* don't release buf, release rxbuff */
                       }
-		      buff = ipaugenblick_get_next_buffer_segment(buff,&len);
+		      buff = ipaugenblick_get_next_buffer_segment(buff,&buflen);
 	  	}
 		ipaugenblick_release_rx_buffer(rxbuff);
 	  }

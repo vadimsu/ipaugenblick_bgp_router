@@ -25,7 +25,7 @@ noinst_HEADERS = \
 	bgp_advertise.h bgp_snmp.h bgp_vty.h bgp_mpath.h
 
 bgpd_SOURCES = bgp_main.c
-bgpd_LDADD = libbgp.a ../lib/libzebra.la @LIBCAP@ @LIBM@
+bgpd_LDADD = libbgp.a ../lib/libzebra.la @LIBCAP@ @LIBM@ -lipaugenblickservice -lrte_eal -lrte_mempool -lrte_ring -lrte_malloc -lrte_timer -lpthread -ldl
 
 examplesdir = $(exampledir)
 dist_examples_DATA = bgpd.conf.sample bgpd.conf.sample2

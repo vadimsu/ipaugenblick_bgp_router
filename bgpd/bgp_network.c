@@ -38,7 +38,7 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 #include "bgpd/bgp_debug.h"
 #include "bgpd/bgp_network.h"
 #ifdef HAVE_IPAUGENBLICK
-#include <ipaugenblick_app_api.h>
+#include <ipaugenblick_api.h>
 #endif
 
 extern struct zebra_privs_t bgpd_privs;
@@ -500,15 +500,7 @@ bgp_listener (int sock, struct sockaddr *sa, socklen_t salen)
 #endif
   if (bgpd_privs.change (ZPRIVS_RAISE))
     zlog_err ("%s: could not raise privs", __func__);
-#ifdef HAVE_IPAUGENBLICK
-   if (peer->su_local)
-    {
-      sockunion_free (peer->su_local);
-      peer->su_local = NULL;
-    }
-   peer->su_local = XCALLOC (MTYPE_SOCKUNION, sizeof (union sockunion));
-   peer->su_local->sin.sin_addr.s_addr = ((struct sockaddr_in *)sa)->sin_addr.s_addr;
-   peer->su_local->sin.sin_port = ((struct sockaddr_in *)sa)->sin_port;
+#ifdef HAVE_IPAUGENBLICK 
    ipaugenblick_v4_connect_bind_socket(sock,((struct sockaddr_in *)sa)->sin_addr.s_addr,((struct sockaddr_in *)sa)->sin_port,0);
 #else
 #ifdef IPTOS_PREC_INTERNETCONTROL
@@ -686,7 +678,7 @@ bgp_close (void)
     {
       thread_cancel (listener->thread);
 #ifdef HAVE_IPAUGENBLICK
-      ipaugenblick_close(sock);
+      ipaugenblick_close(listener->fd);
 #else      
       close (listener->fd);
 #endif

@@ -1051,6 +1051,8 @@ dnl ----------
 
 dnl this is unconditial, for compatibility
 AC_DEFINE(HAVE_IPV6,1,IPv6)
+dnl this version is integrated with IPAugenblick
+AC_DEFINE(HAVE_IPAUGENBLICK,1,IPAugenblick)
 
 dnl ------------------
 dnl IPv6 header checks
