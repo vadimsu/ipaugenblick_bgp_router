@@ -42,9 +42,9 @@ noinst_HEADERS = \
 	interface.h ipforward.h irdp.h router-id.h kernel_socket.h \
 	rt_netlink.h zebra_fpm.h zebra_fpm_private.h
 
-zebra_LDADD = $(otherobj) ../lib/libzebra.la $(LIBCAP)
+zebra_LDADD = $(otherobj) ../lib/libzebra.la $(LIBCAP) -lipaugenblickservice -lrte_eal -lrte_mempool -lrte_ring -lrte_malloc -lrte_timer -lpthread -ldl
 
-testzebra_LDADD = ../lib/libzebra.la $(LIBCAP)
+testzebra_LDADD = ../lib/libzebra.la $(LIBCAP) -lipaugenblickservice -lrte_eal -lrte_mempool -lrte_ring -lrte_malloc -lrte_timer -lpthread -ldl
 
 zebra_DEPENDENCIES = $(otherobj)
 

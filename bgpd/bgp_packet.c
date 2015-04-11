@@ -116,8 +116,11 @@ bgp_connect_check (struct peer *peer)
 
   /* Check file descriptor. */
   slen = sizeof (status);
+#ifdef HAVE_IPAUGENBLICK
+  ret = 0;
+#else
   ret = getsockopt(peer->fd, SOL_SOCKET, SO_ERROR, (void *) &status, &slen);
-
+#endif
   /* If getsockopt is fail, this is fatal error. */
   if (ret < 0)
     {

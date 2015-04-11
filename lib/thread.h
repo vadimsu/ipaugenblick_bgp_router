@@ -57,6 +57,11 @@ struct thread_master
   struct pqueue *background;
   fd_set readfd;
   fd_set writefd;
+#ifdef HAVE_IPAUGENBLICK
+  fd_set readfdpmd;
+  fd_set writefdpmd;
+  int selector;
+#endif
   fd_set exceptfd;
   unsigned long alloc;
 };
@@ -78,6 +83,9 @@ struct thread
     int fd;			/* file descriptor in case of read/write. */
     struct timeval sands;	/* rest of time sands value. */
   } u;
+#ifdef HAVE_IPAUGENBLICK
+  int pmd;
+#endif
   int index;			/* used for timers to store position in queue */
   struct timeval real;
   struct cpu_thread_history *hist; /* cache pointer to cpu_history */
@@ -167,6 +175,10 @@ enum quagga_clkid {
 
 #define thread_add_read(m,f,a,v) funcname_thread_add_read(m,f,a,v,#f,__FILE__,__LINE__)
 #define thread_add_write(m,f,a,v) funcname_thread_add_write(m,f,a,v,#f,__FILE__,__LINE__)
+#ifdef HAVE_IPAUGENBLICK
+#define thread_add_read_pmd(m,f,a,v) funcname_thread_add_read_pmd(m,f,a,v,#f,__FILE__,__LINE__)
+#define thread_add_write_pmd(m,f,a,v) funcname_thread_add_write_pmd(m,f,a,v,#f,__FILE__,__LINE__)
+#endif
 #define thread_add_timer(m,f,a,v) funcname_thread_add_timer(m,f,a,v,#f,__FILE__,__LINE__)
 #define thread_add_timer_msec(m,f,a,v) funcname_thread_add_timer_msec(m,f,a,v,#f,__FILE__,__LINE__)
 #define thread_add_event(m,f,a,v) funcname_thread_add_event(m,f,a,v,#f,__FILE__,__LINE__)

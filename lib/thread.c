@@ -44,7 +44,9 @@ extern int agentx_enabled;
 #include <mach/mach.h>
 #include <mach/mach_time.h>
 #endif
-
+#ifdef HAVE_IPAUGENBLICK
+#include <ipaugenblick_api.h>
+#endif
 
 /* Recent absolute time of day */
 struct timeval recent_time;
@@ -710,6 +712,9 @@ funcname_thread_add_read (struct thread_master *m,
   thread = thread_get (m, THREAD_READ, func, arg, debugargpass);
   FD_SET (fd, &m->readfd);
   thread->u.fd = fd;
+#ifdef HAVE_IPAUGENBLICK
+  thread->pmd = 0;
+#endif
   thread_list_add (&m->read, thread);
 
   return thread;
@@ -734,10 +739,67 @@ funcname_thread_add_write (struct thread_master *m,
   thread = thread_get (m, THREAD_WRITE, func, arg, debugargpass);
   FD_SET (fd, &m->writefd);
   thread->u.fd = fd;
+#ifdef HAVE_IPAUGENBLICK
+  thread->pmd = 0;
+#endif
   thread_list_add (&m->write, thread);
 
   return thread;
 }
+
+#ifdef HAVE_IPAUGENBLICK
+/* Add new read thread. */
+struct thread *
+funcname_thread_add_read_pmd (struct thread_master *m, 
+		 int (*func) (struct thread *), void *arg, int fd,
+		 debugargdef)
+{
+  struct thread *thread;
+
+  assert (m != NULL);
+
+  if (FD_ISSET (fd, &m->readfdpmd))
+    {
+      zlog (NULL, LOG_WARNING, "There is already read fd [%d]", fd);
+      return NULL;
+    }
+
+  thread = thread_get (m, THREAD_READ, func, arg, debugargpass);
+  FD_SET (fd, &m->readfdpmd);
+  ipaugenblick_set_socket_select(fd,m->selector);
+  thread->u.fd = fd;
+  thread->pmd = 1;
+  thread_list_add (&m->read, thread);
+
+  return thread;
+}
+
+/* Add new write thread. */
+struct thread *
+funcname_thread_add_write_pmd (struct thread_master *m,
+		 int (*func) (struct thread *), void *arg, int fd,
+		 debugargdef)
+{
+  struct thread *thread;
+
+  assert (m != NULL);
+
+  if (FD_ISSET (fd, &m->writefdpmd))
+    {
+      zlog (NULL, LOG_WARNING, "There is already write fd [%d]", fd);
+      return NULL;
+    }
+
+  thread = thread_get (m, THREAD_WRITE, func, arg, debugargpass);
+  FD_SET (fd, &m->writefdpmd);
+  ipaugenblick_set_socket_select(fd,m->selector);
+  thread->u.fd = fd;
+  thread->pmd = 1;
+  thread_list_add (&m->write, thread);
+
+  return thread;
+}
+#endif
 
 static struct thread *
 funcname_thread_add_timer_timeval (struct thread_master *m,
@@ -1112,7 +1174,19 @@ thread_fetch (struct thread_master *m, struct thread *fetch)
             timer_wait = &snmp_timer_wait;
         }
 #endif
+#ifdef HAVE_IPAUGENBLICK
+      unsigned short mask;
+      int ready_sock = ipaugenblick_select(m->selector,&mask,0);
+      if(ready_sock) {
+	if(mask & 0x1)
+		FD_ZERO(&readfd);
+	else if(mask & 0x2)
+		FD_ZERO(&writefd);
+	num = 1;
+      }
+#else
       num = select (FD_SETSIZE, &readfd, &writefd, &exceptfd, timer_wait);
+#endif
       
       /* Signals should get quick treatment */
       if (num < 0)
@@ -1146,10 +1220,15 @@ thread_fetch (struct thread_master *m, struct thread *fetch)
       /* Got IO, process it */
       if (num > 0)
         {
+#ifdef HAVE_IPAUGENBLICK
+	  thread_process_fd (&m->read, &readfd, &m->readfdpmd);
+	  thread_process_fd (&m->write, &writefd, &m->writefdpmd);
+#else
           /* Normal priority read thead. */
           thread_process_fd (&m->read, &readfd, &m->readfd);
           /* Write thead. */
           thread_process_fd (&m->write, &writefd, &m->writefd);
+#endif
         }
 
 #if 0

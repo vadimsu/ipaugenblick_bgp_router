@@ -214,7 +214,11 @@ bgp_accept (struct thread *thread)
       zlog_err ("accept_sock is nevative value %d", accept_sock);
       return -1;
     }
+#ifdef HAVE_IPAUGENBLICK
+  listener->thread = thread_add_read_pmd (master, bgp_accept, listener, accept_sock);
+#else
   listener->thread = thread_add_read (master, bgp_accept, listener, accept_sock);
+#endif
 
   /* Accept client connection. */
 #ifdef HAVE_IPAUGENBLICK
@@ -549,7 +553,11 @@ bgp_listener (int sock, struct sockaddr *sa, socklen_t salen)
   listener = XMALLOC (MTYPE_BGP_LISTENER, sizeof(*listener));
   listener->fd = sock;
   memcpy(&listener->su, sa, salen);
+#ifdef HAVE_IPAUGENBLICK
+  listener->thread = thread_add_read_pmd (master, bgp_accept, listener, sock);
+#else
   listener->thread = thread_add_read (master, bgp_accept, listener, sock);
+#endif
   listnode_add (bm->listen_sockets, listener);
 
   return 0;

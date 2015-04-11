@@ -61,6 +61,9 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 #ifdef HAVE_SNMP
 #include "bgpd/bgp_snmp.h"
 #endif /* HAVE_SNMP */
+#ifdef HAVE_IPAUGENBLICK
+#include <ipaugenblick_api.h>
+#endif
 
 /* BGP process wide configuration.  */
 static struct bgp_master bgp_master;
@@ -5411,6 +5414,9 @@ bgp_master_init (void)
   bm->listen_sockets = list_new ();
   bm->port = BGP_PORT_DEFAULT;
   bm->master = thread_master_create ();
+#ifdef HAVE_IPAUGENBLICK
+  bm->master->selector = ipaugenblick_open_select();
+#endif
   bm->start_time = bgp_clock ();
 }
 
