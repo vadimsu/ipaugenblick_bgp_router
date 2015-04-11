@@ -581,6 +581,7 @@ bgp_socket (unsigned short port, const char *address)
   snprintf (port_str, sizeof(port_str), "%d", port);
   port_str[sizeof (port_str) - 1] = '\0';
 #ifdef HAVE_IPAUGENBLICK
+  ret = 0;
 #else
   ret = getaddrinfo (address, port_str, &req, &ainfo_save);
 #endif
