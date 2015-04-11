@@ -218,6 +218,7 @@ bgp_accept (struct thread *thread)
 
   /* Accept client connection. */
 #ifdef HAVE_IPAUGENBLICK
+  zlog_debug ("accepting");
   bgp_sock = ipaugenblick_accept(accept_sock,&su.sin.sin_addr.s_addr,&su.sin.sin_port);
   su.sin.sin_family = AF_INET; /* for now only IPV4 */
 #else
@@ -366,6 +367,7 @@ bgp_update_source (struct peer *peer)
       if (bgp_update_address (ifp, &peer->su, &addr))
 	return;
 #ifdef HAVE_IPAUGENBLICK
+      zlog (peer->log, LOG_INFO, "bind to %x %x",addr.sin.sin_addr.s_addr,addr.sin.sin_port);
       ipaugenblick_v4_connect_bind_socket(peer->fd,addr.sin.sin_addr.s_addr,addr.sin.sin_port,0);
 #else
       sockunion_bind (peer->fd, &addr, 0, &addr);
@@ -375,6 +377,7 @@ bgp_update_source (struct peer *peer)
   /* Source is specified with IP address.  */
   if (peer->update_source)
 #ifdef HAVE_IPAUGENBLICK
+    zlog_debug("updating source");
     if (peer->su_local)
     {
       sockunion_free (peer->su_local);
@@ -383,6 +386,7 @@ bgp_update_source (struct peer *peer)
     peer->su_local = XCALLOC (MTYPE_SOCKUNION, sizeof (union sockunion));
     peer->su_local->sin.sin_addr.s_addr = peer->update_source->sin.sin_addr.s_addr;
     peer->su_local->sin.sin_port = peer->update_source->sin.sin_port;
+    zlog (peer->log, LOG_INFO, "bind to %x %x",peer->update_source->sin.sin_addr.s_addr,peer->update_source->sin.sin_port);
     ipaugenblick_v4_connect_bind_socket(peer->fd,peer->update_source->sin.sin_addr.s_addr,peer->update_source->sin.sin_port,0);
 #else
     sockunion_bind (peer->fd, peer->update_source, 0, peer->update_source);
@@ -397,7 +401,9 @@ bgp_connect (struct peer *peer)
 
   /* Make socket for the peer. */
 #ifdef HAVE_IPAUGENBLICK
+  zlog (peer->log, LOG_INFO, "open socket");
   peer->fd = ipaugenblick_open_socket(AF_INET,SOCK_STREAM,-1);
+  zlog (peer->log, LOG_INFO, "fd %d",peer->fd);
 #else
   peer->fd = sockunion_socket (&peer->su);
 #endif
@@ -457,6 +463,7 @@ bgp_connect (struct peer *peer)
   peer->su_remote = XCALLOC (MTYPE_SOCKUNION, sizeof (union sockunion));
   peer->su_remote->sin.sin_addr.s_addr = peer->su.sin.sin_addr.s_addr;
   peer->su_remote->sin.sin_port = peer->su.sin.sin_port;
+  zlog (peer->log, LOG_INFO, "connect to %x %x",peer->su.sin.sin_addr.s_addr,htons(peer->port));
   return ipaugenblick_v4_connect_bind_socket(peer->fd,peer->su.sin.sin_addr.s_addr,htons(peer->port),1);
 #else
   return sockunion_connect (peer->fd, &peer->su, htons (peer->port), ifindex);
@@ -501,6 +508,7 @@ bgp_listener (int sock, struct sockaddr *sa, socklen_t salen)
   if (bgpd_privs.change (ZPRIVS_RAISE))
     zlog_err ("%s: could not raise privs", __func__);
 #ifdef HAVE_IPAUGENBLICK 
+   zlog_debug("listener: bind to %x %x",((struct sockaddr_in *)sa)->sin_addr.s_addr,((struct sockaddr_in *)sa)->sin_port);
    ipaugenblick_v4_connect_bind_socket(sock,((struct sockaddr_in *)sa)->sin_addr.s_addr,((struct sockaddr_in *)sa)->sin_port,0);
 #else
 #ifdef IPTOS_PREC_INTERNETCONTROL
@@ -580,6 +588,7 @@ bgp_socket (unsigned short port, const char *address)
       if (ainfo->ai_family != AF_INET && ainfo->ai_family != AF_INET6)
 	continue;
 #ifdef HAVE_IPAUGENBLICK
+  zlog_debug("opening socket");
   sock = ipaugenblick_open_socket(AF_INET,SOCK_STREAM,-1);
 #else    
       sock = socket (ainfo->ai_family, ainfo->ai_socktype, ainfo->ai_protocol);
@@ -624,6 +633,7 @@ bgp_socket (unsigned short port, const char *address)
   struct sockaddr_in sin;
   int ret, en;
 #ifdef HAVE_IPAUGENBLICK
+  zlog_debug("opening socket");
   sock = ipaugenblick_open_socket(AF_INET,SOCK_STREAM,-1);
 #else
   sock = socket (AF_INET, SOCK_STREAM, 0);

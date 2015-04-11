@@ -340,7 +340,8 @@ main (int argc, char **argv)
   zlog_default = openzlog (progname, ZLOG_BGP,
 			   LOG_CONS|LOG_NDELAY|LOG_PID, LOG_DAEMON);
 
-  if(ipaugenblick_app_init(argc,argv) != 0) 
+  char *eal_args[] = { "bgpd","-c", "c", "-n", "1", "--proc-type", "secondary" };
+  if(ipaugenblick_app_init(7,eal_args) != 0) 
     {
         printf("cannot initialize IPAugenblick\n");
         return 1;

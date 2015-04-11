@@ -722,8 +722,10 @@ bgp_write (struct thread *thread)
 	    if(txspace < bufnum)
 		bufnum = txspace;
 	    void *bufs[bufnum];
+	    zlog (peer->log, LOG_INFO, "getting %d bufs in bulk",bufnum);
 	    if(ipaugenblick_get_buffers_bulk(1448,peer->fd,bufnum,bufs)) 
 	      {
+		zlog (peer->log, LOG_INFO, "cannot get bulk (%d)",bufnum);
 		BGP_EVENT_ADD (peer, TCP_fatal_error);
 		return 0;
 	      }
@@ -733,6 +735,7 @@ bgp_write (struct thread *thread)
 			int lengths[bufnum];
 			num = 0;
 			int remained = writenum;
+			zlog (peer->log, LOG_INFO, "preparing %d bytes",writenum);
 	    		for(bufidx = 0;bufidx < bufnum;bufidx++) 
 			  {
 				num = remained > 1448 ? 1448 : remained;
@@ -742,13 +745,16 @@ bgp_write (struct thread *thread)
 				stream_forward_getp (s, num);
 				remained -= num;
 	    		  }
+			zlog (peer->log, LOG_INFO, "sending bulk");
 	    		if(ipaugenblick_send_bulk(peer->fd,bufs,offsets,lengths,bufnum))
 			  {
+				zlog (peer->log, LOG_INFO, "can't send bulk");
 				BGP_EVENT_ADD (peer, TCP_fatal_error);
 				return 0;
 			  }
 			else
 			  {
+				zlog (peer->log, LOG_INFO, "kicking socket");
 				ipaugenblick_socket_kick(peer->fd);
 				if(remained > 0)
 					break;
@@ -847,14 +853,17 @@ bgp_write_notify (struct peer *peer)
 	    int bufnum = writenum / 1448 + ((writenum%1448) != 0);
 	    int txspace = ipaugenblick_get_socket_tx_space(peer->fd);
 	    int bufidx;
+	    zlog (peer->log, LOG_INFO, "txspace got %d",txspace);
 	    if(txspace < bufnum) 
 	      {
+		zlog (peer->log, LOG_INFO, "less than required %d",bufnum);
 		BGP_EVENT_ADD (peer, TCP_fatal_error);
 		return 0;
 	      }
 	    void *bufs[bufnum];
 	    if(ipaugenblick_get_buffers_bulk(1448,peer->fd,bufnum,bufs)) 
 	      {
+		zlog (peer->log, LOG_INFO, "can't get buffers bulk");
 		BGP_EVENT_ADD (peer, TCP_fatal_error);
 		return 0;
 	      }
@@ -864,6 +873,7 @@ bgp_write_notify (struct peer *peer)
 			int lengths[bufnum];
 			int num = 0;
 			int remained = writenum;
+			zlog (peer->log, LOG_INFO, "preparing %d bytes",writenum);
 	    		for(bufidx = 0;bufidx < bufnum;bufidx++) 
 			  {
 				num = remained > 1448 ? 1448 : remained;
@@ -873,11 +883,14 @@ bgp_write_notify (struct peer *peer)
 				stream_forward_getp (s, num);
 				remained -= num;
 	    		  }
+			zlog (peer->log, LOG_INFO, "sending bulk");
 	    		if(ipaugenblick_send_bulk(peer->fd,bufs,offsets,lengths,bufnum))
 			  {
+				zlog (peer->log, LOG_INFO, "cannot send bulk");
 				BGP_EVENT_ADD (peer, TCP_fatal_error);
 				return 0;
 			  }
+			zlog (peer->log, LOG_INFO, "kicking socket");
 			ipaugenblick_socket_kick(peer->fd);
 	      }
 	}
@@ -2487,12 +2500,15 @@ bgp_read_packet (struct peer *peer)
 	void *rxbuff;
 	int offset = 0;
 	int buflen = 0;
+	zlog (peer->log, LOG_INFO, "receiving %d bufs (%d bytes)",bufnum,readsize);
 	if(!ipaugenblick_receive(peer->fd,&rxbuff,&len,&bufnum,&buflen))
 	  {
 		void *buff = rxbuff;
+		zlog (peer->log, LOG_INFO, "suceeded");
 		for(bufidx = 0;bufidx < bufnum;bufidx++)
-	  	{ 
-                    if((buff)&&(len > 0)) /* API must be changed to return first segment's length!!! */
+	  	{
+		    zlog (peer->log, LOG_INFO, "buffer#%d is %p len %d",bufidx,buff,buflen);
+                    if((buff)&&(buflen > 0)) /* API must be changed to return first segment's length!!! */
 		      {
                         memcpy(&peer->ibuf[offset],buff,buflen);
 			offset += buflen;
@@ -2500,6 +2516,7 @@ bgp_read_packet (struct peer *peer)
                       }
 		      buff = ipaugenblick_get_next_buffer_segment(buff,&buflen);
 	  	}
+		zlog (peer->log, LOG_INFO, "release rxbuff");
 		ipaugenblick_release_rx_buffer(rxbuff);
 	  }
 	else
