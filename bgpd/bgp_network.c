@@ -377,6 +377,7 @@ bgp_update_source (struct peer *peer)
   /* Source is specified with IP address.  */
   if (peer->update_source)
 #ifdef HAVE_IPAUGENBLICK
+  {
     zlog_debug("updating source");
     if (peer->su_local)
     {
@@ -388,6 +389,7 @@ bgp_update_source (struct peer *peer)
     peer->su_local->sin.sin_port = peer->update_source->sin.sin_port;
     zlog (peer->log, LOG_INFO, "bind to %x %x",peer->update_source->sin.sin_addr.s_addr,peer->update_source->sin.sin_port);
     ipaugenblick_v4_connect_bind_socket(peer->fd,peer->update_source->sin.sin_addr.s_addr,peer->update_source->sin.sin_port,0);
+  }
 #else
     sockunion_bind (peer->fd, peer->update_source, 0, peer->update_source);
 #endif
