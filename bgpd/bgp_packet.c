@@ -697,8 +697,10 @@ bgp_write (struct thread *thread)
   s = bgp_write_packet (peer);
   if (!s)
     return 0;	/* nothing to send */
-
+#ifdef HAVE_IPAUGENBLICK
+#else
   sockopt_cork (peer->fd, 1);
+#endif
 
   /* Nonblocking write until TCP output buffer is full.  */
   do
@@ -709,6 +711,48 @@ bgp_write (struct thread *thread)
       writenum = stream_get_endp (s) - stream_get_getp (s);
 
       /* Call write() system call.  */
+#ifdef HAVE_IPAUGENBLICK
+	{
+	    int bufnum = writenum / 1448 + ((writenum%1448) != 0);
+	    int txspace = ipaugenblick_get_socket_tx_space(peer->fd);
+	    int bufidx;
+	    if(txspace < bufnum)
+		bufnum = txspace;
+	    void *bufs[bufnum];
+	    if(ipaugenblick_get_buffers_bulk(1448,peer->fd,bufnum,bufs)) 
+	      {
+		BGP_EVENT_ADD (peer, TCP_fatal_error);
+		return 0;
+	      }
+	    else
+	      {
+			int offsets[bufnum];
+			int lengths[bufnum];
+			num = 0;
+			remained = writenum;
+	    		for(bufidx = 0;bufidx < bufnum;bufidx++) 
+			  {
+				num = remained > 1448 ? 1448 : remained;
+				offset[bufidx] = 0;
+				lengths[bufidx] = num;
+				memcpy(bufs[bufidx],STREAM_PNT(s),num);
+				stream_forward_getp (s, num);
+				remained -= num;
+	    		  }
+	    		if(ipaugenblick_send_bulk(peer->fd,bufs,offsets,lengths,bufnum))
+			  {
+				BGP_EVENT_ADD (peer, TCP_fatal_error);
+				return 0;
+			  }
+			else
+			  {
+				ipaugenblick_socket_kick(peer->fd);
+				if(remained > 0)
+					break;
+			  }
+	      }
+	}
+#else
       num = write (peer->fd, STREAM_PNT (s), writenum);
       if (num < 0)
 	{
@@ -726,7 +770,7 @@ bgp_write (struct thread *thread)
 	  stream_forward_getp (s, num);
 	  break;
 	}
-
+#endif
       /* Retrieve BGP packet type. */
       stream_set_getp (s, BGP_MARKER_SIZE + 2);
       type = stream_getc (s);
@@ -774,7 +818,10 @@ bgp_write (struct thread *thread)
     BGP_WRITE_ON (peer->t_write, bgp_write, peer->fd);
 
  done:
+#ifdef HAVE_IPAUGENBLICK
+#else
   sockopt_cork (peer->fd, 0);
+#endif
   return 0;
 }
 
@@ -791,14 +838,54 @@ bgp_write_notify (struct peer *peer)
   if (!s)
     return 0;
   assert (stream_get_endp (s) >= BGP_HEADER_SIZE);
-
+#ifdef HAVE_IPAUGENBLICK
+	{
+	    int writenum = stream_get_endp (s);
+	    int bufnum = writenum / 1448 + ((writenum%1448) != 0);
+	    int txspace = ipaugenblick_get_socket_tx_space(peer->fd);
+	    int bufidx;
+	    if(txspace < bufnum) 
+	      {
+		BGP_EVENT_ADD (peer, TCP_fatal_error);
+		return 0;
+	      }
+	    void *bufs[bufnum];
+	    if(ipaugenblick_get_buffers_bulk(1448,peer->fd,bufnum,bufs)) 
+	      {
+		BGP_EVENT_ADD (peer, TCP_fatal_error);
+		return 0;
+	      }
+	    else
+	      {
+			int offsets[bufnum];
+			int lengths[bufnum];
+			num = 0;
+			remained = writenum;
+	    		for(bufidx = 0;bufidx < bufnum;bufidx++) 
+			  {
+				num = remained > 1448 ? 1448 : remained;
+				offset[bufidx] = 0;
+				lengths[bufidx] = num;
+				memcpy(bufs[bufidx],STREAM_DATA (s),num);
+				stream_forward_getp (s, num);
+				remained -= num;
+	    		  }
+	    		if(ipaugenblick_send_bulk(peer->fd,bufs,offsets,lengths,bufnum))
+			  {
+				BGP_EVENT_ADD (peer, TCP_fatal_error);
+				return 0;
+			  }
+			ipaugenblick_socket_kick(peer->fd);
+	      }
+	}
+#else
   /* Stop collecting data within the socket */
   sockopt_cork (peer->fd, 0);
 
   /* socket is in nonblocking mode, if we can't deliver the NOTIFY, well,
    * we only care about getting a clean shutdown at this point. */
   ret = write (peer->fd, STREAM_DATA (s), stream_get_endp (s));
-
+#endif
   /* only connection reset/close gets counted as TCP_fatal_error, failure
    * to write the entire NOTIFY doesn't get different FSM treatment */
   if (ret <= 0)
@@ -806,12 +893,13 @@ bgp_write_notify (struct peer *peer)
       BGP_EVENT_ADD (peer, TCP_fatal_error);
       return 0;
     }
-
+#ifdef HAVE_IPAUGENBLICK
+#else
   /* Disable Nagle, make NOTIFY packet go out right away */
   val = 1;
   (void) setsockopt (peer->fd, IPPROTO_TCP, TCP_NODELAY,
                             (char *) &val, sizeof (val));
-
+#endif
   /* Retrieve BGP packet type. */
   stream_set_getp (s, BGP_MARKER_SIZE + 2);
   type = stream_getc (s);
@@ -2389,7 +2477,35 @@ bgp_read_packet (struct peer *peer)
     return 0;
 
   /* Read packet from fd. */
+#ifdef HAVE_IPAUGENBLICK
+  {
+	int bufnum = readsize / 1448 + ((readsize % 1448) != 0);
+	int len = readsize,bufidx;
+	void *rxbuff;
+	int offset = 0;
+	if(!ipaugenblick_receive(peer->fd,&rxbuff,&len,&bufnum))
+	  {
+		void *buff = rxbuff;
+		for(bufidx = 0;bufidx < bufnum;bufidx++)
+	  	{ 
+                    if((buff)&&(len > 0)) /* API must be changed to return first segment's length!!! */
+		      {
+                        memcpy(&peer->ibuf[offset],bufs[bufidx],len);
+			offset += len;
+                        /* don't release buf, release rxbuff */
+                      }
+		      buff = ipaugenblick_get_next_buffer_segment(buff,&len);
+	  	}
+		ipaugenblick_release_rx_buffer(rxbuff);
+	  }
+	else
+	  {
+		nbytes = -2;
+	  }
+  }
+#else
   nbytes = stream_read_try (peer->ibuf, peer->fd, readsize);
+#endif
 
   /* If read byte is smaller than zero then error occured. */
   if (nbytes < 0) 
