@@ -49,6 +49,9 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 #include "bgpd/bgp_debug.h"
 #include "bgpd/bgp_filter.h"
 #include "bgpd/bgp_zebra.h"
+#ifdef HAVE_IPAUGENBLICK
+#include <ipaugenblick_api.h>
+#endif
 
 /* bgpd options, we use GNU getopt library. */
 static const struct option longopts[] = 
@@ -337,6 +340,11 @@ main (int argc, char **argv)
   zlog_default = openzlog (progname, ZLOG_BGP,
 			   LOG_CONS|LOG_NDELAY|LOG_PID, LOG_DAEMON);
 
+  if(ipaugenblick_app_init(argc,argv) != 0) 
+    {
+        printf("cannot initialize IPAugenblick\n");
+        return 1;
+    }
   /* BGP master init. */
   bgp_master_init ();
 
@@ -412,7 +420,10 @@ main (int argc, char **argv)
 	  usage (progname, 0);
 	  break;
 	default:
+#ifdef HAVE_IPAUGENBLICK
+#else
 	  usage (progname, 1);
+#endif
 	  break;
 	}
     }
