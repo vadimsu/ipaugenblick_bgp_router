@@ -118,6 +118,13 @@ bgp_connect_check (struct peer *peer)
   slen = sizeof (status);
 #ifdef HAVE_IPAUGENBLICK
   ret = 0;
+  status = !(ipaugenblick_is_connected(peer->fd));
+  plog_debug(peer->log,"connect check result %d",status);
+  if(status)
+    {
+	BGP_WRITE_ON (peer->t_write, bgp_write, peer->fd);
+	return;
+    }
 #else
   ret = getsockopt(peer->fd, SOL_SOCKET, SO_ERROR, (void *) &status, &slen);
 #endif
@@ -692,10 +699,11 @@ bgp_write (struct thread *thread)
   /* Yes first of all get peer pointer. */
   peer = THREAD_ARG (thread);
   peer->t_write = NULL;
-
+zlog_debug ("%s %d %d",__func__,__LINE__, peer->status);
   /* For non-blocking IO check. */
   if (peer->status == Connect)
     {
+      zlog (peer->log, LOG_INFO, "checking connected %s",__func__);
       bgp_connect_check (peer);
       return 0;
     }
@@ -2620,7 +2628,7 @@ bgp_read (struct thread *thread)
   /* Yes first of all get peer pointer. */
   peer = THREAD_ARG (thread);
   peer->t_read = NULL;
-
+zlog_debug ("%s %d %d",__func__,__LINE__, peer->status);
   /* For non-blocking IO check. */
   if (peer->status == Connect)
     {

@@ -5416,6 +5416,7 @@ bgp_master_init (void)
   bm->master = thread_master_create ();
 #ifdef HAVE_IPAUGENBLICK
   bm->master->selector = ipaugenblick_open_select();
+  zlog_debug ("%s %d %d",__func__,__LINE__, bm->master->selector);
 #endif
   bm->start_time = bgp_clock ();
 }

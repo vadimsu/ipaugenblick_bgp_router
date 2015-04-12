@@ -133,7 +133,19 @@ enum quagga_clkid {
 #define THREAD_ARG(X) ((X)->arg)
 #define THREAD_FD(X)  ((X)->u.fd)
 #define THREAD_VAL(X) ((X)->u.val)
+#ifdef HAVE_IPAUGENBLICK
+#define THREAD_READ_ON_PMD(master,thread,func,arg,sock) \
+  do { \
+    if (! thread) \
+      thread = thread_add_read_pmd (master, func, arg, sock); \
+  } while (0)
 
+#define THREAD_WRITE_ON_PMD(master,thread,func,arg,sock) \
+  do { \
+    if (! thread) \
+      thread = thread_add_write_pmd (master, func, arg, sock); \
+  } while (0)
+#endif
 #define THREAD_READ_ON(master,thread,func,arg,sock) \
   do { \
     if (! thread) \
@@ -166,7 +178,18 @@ enum quagga_clkid {
         thread = NULL; \
       } \
   } while (0)
-
+#ifdef HAVE_IPAUGENBLICK
+#define THREAD_OFF_PMD(thread) \
+  do { \
+    if (thread) \
+      { \
+        thread_cancel_pmd (thread); \
+        thread = NULL; \
+      } \
+  } while (0)
+#define THREAD_READ_OFF_PMD(thread)  THREAD_OFF_PMD(thread)
+#define THREAD_WRITE_OFF_PMD(thread)  THREAD_OFF_PMD(thread)
+#endif
 #define THREAD_READ_OFF(thread)  THREAD_OFF(thread)
 #define THREAD_WRITE_OFF(thread)  THREAD_OFF(thread)
 #define THREAD_TIMER_OFF(thread)  THREAD_OFF(thread)
@@ -197,6 +220,14 @@ extern struct thread *funcname_thread_add_read (struct thread_master *,
 extern struct thread *funcname_thread_add_write (struct thread_master *,
 				                 int (*)(struct thread *),
 				                 void *, int, debugargdef);
+#ifdef HAVE_IPAUGENBLICK
+extern struct thread *funcname_thread_add_read_pmd (struct thread_master *, 
+				                int (*)(struct thread *),
+				                void *, int, debugargdef);
+extern struct thread *funcname_thread_add_write_pmd (struct thread_master *,
+				                 int (*)(struct thread *),
+				                 void *, int, debugargdef);
+#endif
 extern struct thread *funcname_thread_add_timer (struct thread_master *,
 				                 int (*)(struct thread *),
 				                 void *, long, debugargdef);
@@ -217,6 +248,10 @@ extern struct thread *funcname_thread_execute (struct thread_master *,
 #undef debugargdef
 
 extern void thread_cancel (struct thread *);
+
+#ifdef HAVE_IPAUGENBLICK
+extern void thread_cancel_pmd (struct thread *);
+#endif
 extern unsigned int thread_cancel_event (struct thread_master *, void *);
 extern struct thread *thread_fetch (struct thread_master *, struct thread *);
 extern void thread_call (struct thread *);
