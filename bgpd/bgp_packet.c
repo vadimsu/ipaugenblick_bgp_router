@@ -2512,6 +2512,7 @@ bgp_read_packet (struct peer *peer)
 	int offset = 0;
 	int buflen = 0;
 	zlog (peer->log, LOG_INFO, "receiving %d bufs (%d bytes)",bufnum,readsize);
+	nbytes = 0;
 	if(!ipaugenblick_receive(peer->fd,&rxbuff,&len,&bufnum,&buflen))
 	  {
 		void *buff = rxbuff;
@@ -2523,6 +2524,7 @@ bgp_read_packet (struct peer *peer)
 		      {
                         memcpy(&peer->ibuf[offset],buff,buflen);
 			offset += buflen;
+			nbytes += buflen;
                         /* don't release buf, release rxbuff */
                       }
 		      buff = ipaugenblick_get_next_buffer_segment(buff,&buflen);
