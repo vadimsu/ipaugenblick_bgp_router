@@ -763,7 +763,7 @@ funcname_thread_add_read_pmd (struct thread_master *m,
       zlog (NULL, LOG_WARNING, "There is already read fd [%d]", fd);
       return NULL;
     }
-
+  zlog(NULL,LOG_DEBUG, "%s %d %d",__func__,__LINE__,fd);
   thread = thread_get (m, THREAD_READ, func, arg, debugargpass);
   FD_SET (fd, &m->readfdpmd);
   ipaugenblick_set_socket_select(fd,m->selector);
@@ -789,7 +789,7 @@ funcname_thread_add_write_pmd (struct thread_master *m,
       zlog (NULL, LOG_WARNING, "There is already write fd [%d]", fd);
       return NULL;
     }
-
+  zlog(NULL,LOG_DEBUG, "%s %d %d",__func__,__LINE__,fd);
   thread = thread_get (m, THREAD_WRITE, func, arg, debugargpass);
   FD_SET (fd, &m->writefdpmd);
   ipaugenblick_set_socket_select(fd,m->selector);
@@ -1145,6 +1145,7 @@ thread_fetch (struct thread_master *m, struct thread *fetch)
       /* Calculate select wait timer if nothing else to do */
       if (m->ready.count == 0)
         {
+	  zlog(NULL,LOG_DEBUG, "%s %d",__func__,__LINE__);
           quagga_get_relative (NULL);
           timer_wait = thread_timer_wait (m->timer, &timer_val);
           timer_wait_bg = thread_timer_wait (m->background, &timer_val_bg);
@@ -1177,16 +1178,15 @@ thread_fetch (struct thread_master *m, struct thread *fetch)
 #ifdef HAVE_IPAUGENBLICK
       unsigned short mask;
       int ready_sock = ipaugenblick_select(m->selector,&mask,0);
-      if(ready_sock) {
-	if(mask & 0x1)
-		FD_ZERO(&readfd);
-	else if(mask & 0x2)
-		FD_ZERO(&writefd);
+      zlog(NULL,LOG_DEBUG, "%s %d %d %x",__func__,__LINE__,ready_sock,mask);
+      if(ready_sock != -1) {
+	FD_ZERO(&writefd);
+	FD_ZERO(&readfd);
 	num = 1;
       }
-#else
-      num = select (FD_SETSIZE, &readfd, &writefd, &exceptfd, timer_wait);
+      else
 #endif
+      num = select (FD_SETSIZE, &readfd, &writefd, &exceptfd, timer_wait);
       
       /* Signals should get quick treatment */
       if (num < 0)
@@ -1221,8 +1221,26 @@ thread_fetch (struct thread_master *m, struct thread *fetch)
       if (num > 0)
         {
 #ifdef HAVE_IPAUGENBLICK
-	  thread_process_fd (&m->read, &readfd, &m->readfdpmd);
-	  thread_process_fd (&m->write, &writefd, &m->writefdpmd);
+	  if (ready_sock != -1)
+	    {
+		if(mask & 0x1)
+		  {
+			FD_SET(ready_sock,&readfd);
+		  	thread_process_fd (&m->read, &readfd, &m->readfdpmd);
+		  }
+		if(mask & 0x2)
+		  {
+			  FD_SET(ready_sock,&writefd);	
+			  thread_process_fd (&m->write, &writefd, &m->writefdpmd);
+		  }
+	    }
+	  else
+	    {
+		/* Normal priority read thead. */
+	        thread_process_fd (&m->read, &readfd, &m->readfd);
+        	/* Write thead. */
+	        thread_process_fd (&m->write, &writefd, &m->writefd);
+	    }
 #else
           /* Normal priority read thead. */
           thread_process_fd (&m->read, &readfd, &m->readfd);

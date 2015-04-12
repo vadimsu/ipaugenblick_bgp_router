@@ -408,7 +408,7 @@ bgp_connect (struct peer *peer)
   /* Make socket for the peer. */
 #ifdef HAVE_IPAUGENBLICK
   zlog (peer->log, LOG_INFO, "open socket");
-  peer->fd = ipaugenblick_open_socket(AF_INET,SOCK_STREAM,-1);
+  peer->fd = ipaugenblick_open_socket(AF_INET,SOCK_STREAM,master->selector);
   zlog (peer->log, LOG_INFO, "fd %d",peer->fd);
 #else
   peer->fd = sockunion_socket (&peer->su);
@@ -600,7 +600,7 @@ bgp_socket (unsigned short port, const char *address)
 	continue;
 #ifdef HAVE_IPAUGENBLICK
   zlog_debug("opening socket");
-  sock = ipaugenblick_open_socket(AF_INET,SOCK_STREAM,-1);
+  sock = ipaugenblick_open_socket(AF_INET,SOCK_STREAM,master->selector);
 #else    
       sock = socket (ainfo->ai_family, ainfo->ai_socktype, ainfo->ai_protocol);
 #endif
@@ -645,7 +645,7 @@ bgp_socket (unsigned short port, const char *address)
   int ret, en;
 #ifdef HAVE_IPAUGENBLICK
   zlog_debug("opening socket");
-  sock = ipaugenblick_open_socket(AF_INET,SOCK_STREAM,-1);
+  sock = ipaugenblick_open_socket(AF_INET,SOCK_STREAM,master->selector);
 #else
   sock = socket (AF_INET, SOCK_STREAM, 0);
 #endif
