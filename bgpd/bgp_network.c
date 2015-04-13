@@ -224,6 +224,12 @@ bgp_accept (struct thread *thread)
 #ifdef HAVE_IPAUGENBLICK
   zlog_debug ("accepting");
   bgp_sock = ipaugenblick_accept(accept_sock,&su.sin.sin_addr.s_addr,&su.sin.sin_port);
+  if(bgp_sock < 0)
+    {
+        zlog_err ("[Error] BGP socket accept failed (%s)", safe_strerror (errno));
+        return -1;
+    }
+  ipaugenblick_set_socket_select(bgp_sock,master->selector);
   su.sin.sin_family = AF_INET; /* for now only IPV4 */
 #else
   bgp_sock = sockunion_accept (accept_sock, &su);
@@ -582,6 +588,13 @@ bgp_socket (unsigned short port, const char *address)
   port_str[sizeof (port_str) - 1] = '\0';
 #ifdef HAVE_IPAUGENBLICK
   ret = 0;
+  struct sockaddr_in sin;
+  sin.sin_family = AF_INET;
+  sin.sin_addr.s_addr = inet_addr("192.168.150.63");
+  sin.sin_port = 179;
+  int sock = ipaugenblick_open_socket(AF_INET,SOCK_STREAM,master->selector);
+  bgp_listener (sock, &sin, sizeof(sin));
+  return 0;
 #else
   ret = getaddrinfo (address, port_str, &req, &ainfo_save);
 #endif

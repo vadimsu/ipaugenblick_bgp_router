@@ -2506,31 +2506,30 @@ bgp_read_packet (struct peer *peer)
   /* Read packet from fd. */
 #ifdef HAVE_IPAUGENBLICK
   {
-	int bufnum = readsize / 1448 + ((readsize % 1448) != 0);
 	int len = readsize,bufidx;
 	void *rxbuff;
-	int offset = 0;
 	int buflen = 0;
-	zlog (peer->log, LOG_INFO, "receiving %d bufs (%d bytes)",bufnum,readsize);
+	zlog (peer->log, LOG_INFO, "receiving %d bytes",readsize);
 	nbytes = 0;
-	if(!ipaugenblick_receive(peer->fd,&rxbuff,&len,&bufnum,&buflen))
+	if(!ipaugenblick_receive(peer->fd,&rxbuff,&len,&buflen))
 	  {
 		void *buff = rxbuff;
 		zlog (peer->log, LOG_INFO, "suceeded");
-		for(bufidx = 0;bufidx < bufnum;bufidx++)
+		while(buff)
 	  	{
 		    zlog (peer->log, LOG_INFO, "buffer#%d is %p len %d",bufidx,buff,buflen);
-                    if((buff)&&(buflen > 0)) /* API must be changed to return first segment's length!!! */
+                    if(buflen > 0) /* API must be changed to return first segment's length!!! */
 		      {
-                        memcpy(&peer->ibuf[offset],buff,buflen);
-			offset += buflen;
+                        memcpy(peer->ibuf->data + peer->ibuf->endp,buff,buflen);
+			peer->ibuf->endp += buflen;
 			nbytes += buflen;
                         /* don't release buf, release rxbuff */
                       }
+		      zlog (peer->log, LOG_INFO, "getting next buffer");
 		      buff = ipaugenblick_get_next_buffer_segment(buff,&buflen);
 	  	}
 		zlog (peer->log, LOG_INFO, "release rxbuff");
-		ipaugenblick_release_rx_buffer(rxbuff);
+		ipaugenblick_release_rx_buffer(rxbuff,peer->fd);
 	  }
 	else
 	  {
