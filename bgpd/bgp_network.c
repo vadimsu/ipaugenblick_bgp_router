@@ -228,7 +228,7 @@ bgp_accept (struct thread *thread)
     {
         zlog_err ("[Error] BGP socket accept failed (%s)", safe_strerror (errno));
         return -1;
-    }
+    } 
   ipaugenblick_set_socket_select(bgp_sock,master->selector);
   su.sin.sin_family = AF_INET; /* for now only IPV4 */
 #else
@@ -487,6 +487,21 @@ void
 bgp_getsockname (struct peer *peer)
 {
 #ifdef HAVE_IPAUGENBLICK
+  if (peer->su_local)
+    {
+      sockunion_free (peer->su_local);
+      peer->su_local = NULL;
+    }
+
+  if (peer->su_remote)
+    {
+      sockunion_free (peer->su_remote);
+      peer->su_remote = NULL;
+    }
+  peer->su_local = XCALLOC (MTYPE_SOCKUNION, sizeof (union sockunion));
+  peer->su_remote = XCALLOC (MTYPE_SOCKUNION, sizeof (union sockunion));
+  ipaugenblick_getsockname(peer->fd,1,&peer->su_local->sin.sin_addr.s_addr,&peer->su_local->sin.sin_port);/* local */
+  ipaugenblick_getsockname(peer->fd,0,&peer->su_remote->sin.sin_addr.s_addr,&peer->su_remote->sin.sin_port);
 #else
   if (peer->su_local)
     {

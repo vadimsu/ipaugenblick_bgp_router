@@ -2507,26 +2507,28 @@ bgp_read_packet (struct peer *peer)
 #ifdef HAVE_IPAUGENBLICK
   {
 	int len = readsize,bufidx;
-	void *rxbuff;
+	void **rxbuff;
 	int buflen = 0;
 	zlog (peer->log, LOG_INFO, "receiving %d bytes",readsize);
 	nbytes = 0;
 	if(!ipaugenblick_receive(peer->fd,&rxbuff,&len,&buflen))
 	  {
-		void *buff = rxbuff;
+		void *buff;
+		void **bufdesc = rxbuff;
 		zlog (peer->log, LOG_INFO, "suceeded");
-		while(buff)
+		while(bufdesc)
 	  	{
+		    buff = *bufdesc;
 		    zlog (peer->log, LOG_INFO, "buffer#%d is %p len %d",bufidx,buff,buflen);
                     if(buflen > 0) /* API must be changed to return first segment's length!!! */
-		      {
-                        memcpy(peer->ibuf->data + peer->ibuf->endp,buff,buflen);
+		      {	
+                        memcpy((void *)(peer->ibuf->data + peer->ibuf->endp),buff,buflen);
 			peer->ibuf->endp += buflen;
 			nbytes += buflen;
                         /* don't release buf, release rxbuff */
                       }
 		      zlog (peer->log, LOG_INFO, "getting next buffer");
-		      buff = ipaugenblick_get_next_buffer_segment(buff,&buflen);
+		      bufdesc = ipaugenblick_get_next_buffer_segment(bufdesc,&buflen);
 	  	}
 		zlog (peer->log, LOG_INFO, "release rxbuff");
 		ipaugenblick_release_rx_buffer(rxbuff,peer->fd);
