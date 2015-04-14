@@ -712,9 +712,6 @@ funcname_thread_add_read (struct thread_master *m,
   thread = thread_get (m, THREAD_READ, func, arg, debugargpass);
   FD_SET (fd, &m->readfd);
   thread->u.fd = fd;
-#ifdef HAVE_IPAUGENBLICK
-  thread->pmd = 0;
-#endif
   zlog(NULL,LOG_DEBUG, "%s %d %d",__func__,__LINE__,fd);
   thread_list_add (&m->read, thread);
 
@@ -740,9 +737,6 @@ funcname_thread_add_write (struct thread_master *m,
   thread = thread_get (m, THREAD_WRITE, func, arg, debugargpass);
   FD_SET (fd, &m->writefd);
   thread->u.fd = fd;
-#ifdef HAVE_IPAUGENBLICK
-  thread->pmd = 0;
-#endif
   zlog(NULL,LOG_DEBUG, "%s %d %d",__func__,__LINE__,fd);
   thread_list_add (&m->write, thread);
 
@@ -769,7 +763,6 @@ funcname_thread_add_read_pmd (struct thread_master *m,
   thread = thread_get (m, THREAD_READ, func, arg, debugargpass);
   FD_SET (fd, &m->readfdpmd);
   thread->u.fd = fd;
-  thread->pmd = 1;
   thread_list_add (&m->read, thread);
 
   return thread;
@@ -794,7 +787,6 @@ funcname_thread_add_write_pmd (struct thread_master *m,
   thread = thread_get (m, THREAD_WRITE, func, arg, debugargpass);
   FD_SET (fd, &m->writefdpmd);
   thread->u.fd = fd;
-  thread->pmd = 1;
   thread_list_add (&m->write, thread);
 
   return thread;
@@ -1208,7 +1200,6 @@ thread_fetch (struct thread_master *m, struct thread *fetch)
       /* Calculate select wait timer if nothing else to do */
       if (m->ready.count == 0)
         {
-	  zlog(NULL,LOG_DEBUG, "%s %d",__func__,__LINE__);
           quagga_get_relative (NULL);
           timer_wait = thread_timer_wait (m->timer, &timer_val);
           timer_wait_bg = thread_timer_wait (m->background, &timer_val_bg);
@@ -1240,16 +1231,12 @@ thread_fetch (struct thread_master *m, struct thread *fetch)
 #endif
 #ifdef HAVE_IPAUGENBLICK
       unsigned short mask;
-      int ready_sock = ipaugenblick_select(m->selector,&mask,0);
-      zlog(NULL,LOG_DEBUG, "%s %d %d %x",__func__,__LINE__,ready_sock,mask);
-      if(ready_sock != -1) 
-	{	
-	  num = 1;
-        }
-        else
-#endif
-      num = select (FD_SETSIZE, &readfd, &writefd, &exceptfd, timer_wait);
-      
+      int ready_sock = ipaugenblick_select(m->selector,&mask,1000); 
+      struct timeval null_timer_val = { .tv_sec = 0, .tv_usec = 0 };
+      num = select (FD_SETSIZE, &readfd, &writefd, &exceptfd, &null_timer_val);
+#else
+      num = select (FD_SETSIZE, &readfd, &writefd, &exceptfd,timer_wait );
+#endif      
       /* Signals should get quick treatment */
       if (num < 0)
         {
@@ -1280,11 +1267,10 @@ thread_fetch (struct thread_master *m, struct thread *fetch)
       thread_timer_process (m->timer, &relative_time);
       
       /* Got IO, process it */
-      if (num > 0)
-        {
 #ifdef HAVE_IPAUGENBLICK
-	  if (ready_sock != -1)
-	    {
+	if (ready_sock != -1)
+	  {
+		zlog(NULL,LOG_DEBUG, "%s %d %d %x",__func__,__LINE__,ready_sock,mask);
 		if(mask & 0x1)
 		  {
 			FD_SET(ready_sock,&readfdpmd);
@@ -1298,19 +1284,13 @@ thread_fetch (struct thread_master *m, struct thread *fetch)
 			  thread_process_fd (&m->write, &writefdpmd, &m->writefdpmd);
 		  }
 	    }
-	  else
-	    {
-		/* Normal priority read thead. */
-	        thread_process_fd (&m->read, &readfd, &m->readfd);
-        	/* Write thead. */
-	        thread_process_fd (&m->write, &writefd, &m->writefd);
-	    }
-#else
+#endif
+      if (num > 0)
+        {
           /* Normal priority read thead. */
           thread_process_fd (&m->read, &readfd, &m->readfd);
           /* Write thead. */
           thread_process_fd (&m->write, &writefd, &m->writefd);
-#endif
         }
 
 #if 0

@@ -699,6 +699,9 @@ bgp_write (struct thread *thread)
   /* Yes first of all get peer pointer. */
   peer = THREAD_ARG (thread);
   peer->t_write = NULL;
+#ifdef HAVE_IPAUGENBLICK
+  peer->io_events_mask |= 0x2;
+#endif
 zlog_debug ("%s %d %d",__func__,__LINE__, peer->status);
   /* For non-blocking IO check. */
   if (peer->status == Connect)
@@ -753,6 +756,15 @@ zlog_debug ("%s %d %d",__func__,__LINE__, peer->status);
 				offsets[bufidx] = 0;
 				lengths[bufidx] = num;
 				memcpy(bufs[bufidx],STREAM_PNT(s),num);
+			{
+				int j;
+				printf("dump %d bytes\n",num);
+				for(j = 0;j < num;j++){
+					unsigned char *p = (unsigned char *)bufs[bufidx];
+					printf("  %x",p[j]);
+				}
+				printf("\n");
+			}
 				stream_forward_getp (s, num);
 				remained -= num;
 	    		  }
@@ -760,6 +772,7 @@ zlog_debug ("%s %d %d",__func__,__LINE__, peer->status);
 	    		if(ipaugenblick_send_bulk(peer->fd,bufs,offsets,lengths,bufnum))
 			  {
 				zlog (peer->log, LOG_INFO, "can't send bulk");
+				peer->io_events_mask &= ~(0x2);
 				BGP_EVENT_ADD (peer, TCP_fatal_error);
 				return 0;
 			  }
@@ -767,6 +780,7 @@ zlog_debug ("%s %d %d",__func__,__LINE__, peer->status);
 			  {
 				zlog (peer->log, LOG_INFO, "kicking socket");
 				ipaugenblick_socket_kick(peer->fd);
+  				peer->io_events_mask &= ~(0x2);
 				if(remained > 0)
 					break;
 			  }
@@ -898,6 +912,7 @@ bgp_write_notify (struct peer *peer)
 	    		if(ipaugenblick_send_bulk(peer->fd,bufs,offsets,lengths,bufnum))
 			  {
 				zlog (peer->log, LOG_INFO, "cannot send bulk");
+				peer->io_events_mask &= ~(0x2);
 				BGP_EVENT_ADD (peer, TCP_fatal_error);
 				return 0;
 			  }
@@ -2535,6 +2550,7 @@ bgp_read_packet (struct peer *peer)
 	  }
 	else
 	  {
+  		peer->io_events_mask &= ~(0x1);
 		nbytes = -2;
 	  }
   }
@@ -2631,7 +2647,10 @@ bgp_read (struct thread *thread)
   /* Yes first of all get peer pointer. */
   peer = THREAD_ARG (thread);
   peer->t_read = NULL;
-zlog_debug ("%s %d %d",__func__,__LINE__, peer->status);
+#ifdef HAVE_IPAUGENBLICK
+  peer->io_events_mask |= 0x1;
+#endif
+
   /* For non-blocking IO check. */
   if (peer->status == Connect)
     {
@@ -2647,6 +2666,10 @@ zlog_debug ("%s %d %d",__func__,__LINE__, peer->status);
 	}
       BGP_READ_ON (peer->t_read, bgp_read, peer->fd);
     }
+#ifdef HAVE_IPAUGENBLICK
+    if (!peer->ibuf)
+	goto done;
+#endif
 
   /* Read packet header to determine type of the packet */
   if (peer->packet_size == 0)

@@ -27,7 +27,15 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 #define BGP_READ_ON(T,F,V)			\
   do {						\
     if (!(T) && (peer->status != Deleted))	\
-      THREAD_READ_ON_PMD(master,T,F,peer,V);	\
+      {						\
+	if(peer->io_events_mask & 0x1)		\
+	  {					\
+		printf("%s %s %d\n",__FILE__,__func__,__LINE__); \
+	  thread_add_background(master,F,peer,V);	\
+	  }					\
+	else					\
+      	  THREAD_READ_ON_PMD(master,T,F,peer,V);	\
+      }						\
   } while (0)
 #else
 #define BGP_READ_ON(T,F,V)			\
@@ -54,8 +62,16 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 #ifdef HAVE_IPAUGENBLICK
 #define BGP_WRITE_ON(T,F,V)			\
   do {						\
-    if (!(T) && (peer->status != Deleted))	\
-      THREAD_WRITE_ON_PMD(master,(T),(F),peer,(V)); \
+    if (!(T) && (peer->status != Deleted)) 	\
+      {						\
+	if(peer->io_events_mask & 0x2)		\
+	  {					\
+		printf("%s %s %d\n",__FILE__,__func__,__LINE__); \
+	      thread_add_background(master,F,peer,V);	\
+	  }					\
+	else					\
+      	  THREAD_WRITE_ON_PMD(master,(T),(F),peer,(V)); \
+      }						\
   } while (0)
 #else
 #define BGP_WRITE_ON(T,F,V)			\

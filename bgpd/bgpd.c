@@ -842,7 +842,9 @@ peer_new (struct bgp *bgp)
   /* Get service port number.  */
   sp = getservbyname ("bgp", "tcp");
   peer->port = (sp == NULL) ? BGP_PORT_DEFAULT : ntohs (sp->s_port);
-
+#ifdef HAVE_IPAUGENBLICK
+  peer->io_events_mask = 0;
+#endif
   return peer;
 }
 
