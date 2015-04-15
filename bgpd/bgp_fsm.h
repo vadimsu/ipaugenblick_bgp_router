@@ -32,6 +32,7 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 	  {					\
 		printf("%s %s %d\n",__FILE__,__func__,__LINE__); \
 	      T = thread_add_background(master,F,peer,V);	\
+	      T->pmd = 1;			\
 	      if (!FD_ISSET (V, &master->readfdpmd))	\
     		{					\
 			T->u.fd = V;		\
@@ -73,6 +74,7 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 	  {					\
 		printf("%s %s %d\n",__FILE__,__func__,__LINE__); \
 	      T = thread_add_background(master,F,peer,V);	\
+	      T->pmd = 1;			\
 	      if (!FD_ISSET (V, &master->writefdpmd))	\
     		{					\
 			T->u.fd = V;		\

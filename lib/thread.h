@@ -89,6 +89,9 @@ struct thread
   const char *funcname;
   const char *schedfrom;
   int schedfrom_line;
+#ifdef HAVE_IPAUGENBLICK
+  int pmd;
+#endif
 };
 
 struct cpu_thread_history 
@@ -171,6 +174,7 @@ enum quagga_clkid {
   do { \
     if (thread) \
       { \
+printf("thread_off %s %d %p\n",__FILE__,__LINE__,thread); \
         thread_cancel (thread); \
         thread = NULL; \
       } \
@@ -180,6 +184,7 @@ enum quagga_clkid {
   do { \
     if (thread) \
       { \
+printf("thread_off_pmd %s %d %p\n",__FILE__,__LINE__,thread); \
         thread_cancel_pmd (thread); \
         thread = NULL; \
       } \

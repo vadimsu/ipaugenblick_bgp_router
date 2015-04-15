@@ -763,6 +763,7 @@ funcname_thread_add_read_pmd (struct thread_master *m,
   thread = thread_get (m, THREAD_READ, func, arg, debugargpass);
   FD_SET (fd, &m->readfdpmd);
   thread->u.fd = fd;
+  thread->pmd = 1;
   thread_list_add (&m->read, thread);
 
   return thread;
@@ -787,6 +788,7 @@ funcname_thread_add_write_pmd (struct thread_master *m,
   thread = thread_get (m, THREAD_WRITE, func, arg, debugargpass);
   FD_SET (fd, &m->writefdpmd);
   thread->u.fd = fd;
+  thread->pmd = 1;
   thread_list_add (&m->write, thread);
 
   return thread;
@@ -989,6 +991,19 @@ thread_cancel (struct thread *thread)
       break;
     case THREAD_BACKGROUND:
       queue = thread->master->background;
+#ifdef HAVE_IPAUGENBLICK
+      if(thread->pmd)
+	{
+		if(FD_ISSET (thread->u.fd, &thread->master->readfd))
+		  {
+			FD_CLR (thread->u.fd, &thread->master->readfd);
+		  }
+		if(FD_ISSET (thread->u.fd, &thread->master->writefd))
+		  {
+			FD_CLR (thread->u.fd, &thread->master->writefd);
+		  }
+	}
+#endif
       break;
     default:
       return;
