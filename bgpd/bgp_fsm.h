@@ -31,7 +31,7 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 	if(peer->io_events_mask & 0x1)		\
 	  {					\
 		printf("%s %s %d\n",__FILE__,__func__,__LINE__); \
-	  thread_add_background(master,F,peer,V);	\
+	  T = thread_add_background(master,F,peer,V);	\
 	  }					\
 	else					\
       	  THREAD_READ_ON_PMD(master,T,F,peer,V);	\
@@ -67,7 +67,7 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 	if(peer->io_events_mask & 0x2)		\
 	  {					\
 		printf("%s %s %d\n",__FILE__,__func__,__LINE__); \
-	      thread_add_background(master,F,peer,V);	\
+	      T = thread_add_background(master,F,peer,V);	\
 	  }					\
 	else					\
       	  THREAD_WRITE_ON_PMD(master,(T),(F),peer,(V)); \

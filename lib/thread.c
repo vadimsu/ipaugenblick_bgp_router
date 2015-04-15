@@ -910,7 +910,7 @@ thread_cancel_pmd (struct thread *thread)
 {
   struct thread_list *list = NULL;
   struct pqueue *queue = NULL;
-  
+zlog(NULL,LOG_DEBUG, "%s %d %d",__func__,__LINE__,thread->type); 
   switch (thread->type)
     {
     case THREAD_READ:
@@ -965,7 +965,7 @@ thread_cancel (struct thread *thread)
 {
   struct thread_list *list = NULL;
   struct pqueue *queue = NULL;
-  
+ zlog(NULL,LOG_DEBUG, "%s %d %d %p",__func__,__LINE__,thread->type,thread);  
   switch (thread->type)
     {
     case THREAD_READ:
@@ -1101,7 +1101,10 @@ thread_process_fd (struct thread_list *list, fd_set *fdset, fd_set *mfdset)
           thread_list_add (&thread->master->ready, thread);
           thread->type = THREAD_READY;
           ready++;
+		zlog(NULL,LOG_DEBUG, "%s %d",__func__,__LINE__);
         }
+	else
+		zlog(NULL,LOG_DEBUG, "%s %d",__func__,__LINE__);
     }
   return ready;
 }
@@ -1231,7 +1234,7 @@ thread_fetch (struct thread_master *m, struct thread *fetch)
 #endif
 #ifdef HAVE_IPAUGENBLICK
       unsigned short mask;
-      int ready_sock = ipaugenblick_select(m->selector,&mask,1000); 
+      int ready_sock = ipaugenblick_select(m->selector,&mask,0); 
       struct timeval null_timer_val = { .tv_sec = 0, .tv_usec = 0 };
       num = select (FD_SETSIZE, &readfd, &writefd, &exceptfd, &null_timer_val);
 #else

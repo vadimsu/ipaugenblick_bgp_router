@@ -735,7 +735,7 @@ zlog_debug ("%s %d %d",__func__,__LINE__, peer->status);
 	    int bufidx;
 	    if(txspace < bufnum)
 		bufnum = txspace;
-	    void *bufs[bufnum];
+	    void **bufs[bufnum];
 	    zlog (peer->log, LOG_INFO, "getting %d bufs in bulk",bufnum);
 	    if(ipaugenblick_get_buffers_bulk(1448,peer->fd,bufnum,bufs)) 
 	      {
@@ -755,12 +755,12 @@ zlog_debug ("%s %d %d",__func__,__LINE__, peer->status);
 				num = remained > 1448 ? 1448 : remained;
 				offsets[bufidx] = 0;
 				lengths[bufidx] = num;
-				memcpy(bufs[bufidx],STREAM_PNT(s),num);
+				memcpy(*bufs[bufidx],STREAM_PNT(s),num);
 			{
 				int j;
 				printf("dump %d bytes\n",num);
 				for(j = 0;j < num;j++){
-					unsigned char *p = (unsigned char *)bufs[bufidx];
+					unsigned char *p = (unsigned char *)*bufs[bufidx];
 					printf("  %x",p[j]);
 				}
 				printf("\n");
@@ -885,7 +885,7 @@ bgp_write_notify (struct peer *peer)
 		BGP_EVENT_ADD (peer, TCP_fatal_error);
 		return 0;
 	      }
-	    void *bufs[bufnum];
+	    void **bufs[bufnum];
 	    if(ipaugenblick_get_buffers_bulk(1448,peer->fd,bufnum,bufs)) 
 	      {
 		zlog (peer->log, LOG_INFO, "can't get buffers bulk");
@@ -904,7 +904,7 @@ bgp_write_notify (struct peer *peer)
 				num = remained > 1448 ? 1448 : remained;
 				offsets[bufidx] = 0;
 				lengths[bufidx] = num;
-				memcpy(bufs[bufidx],STREAM_DATA (s),num);
+				memcpy(*bufs[bufidx],STREAM_DATA (s),num);
 				stream_forward_getp (s, num);
 				remained -= num;
 	    		  }
@@ -2513,7 +2513,7 @@ bgp_read_packet (struct peer *peer)
   int readsize;
 
   readsize = peer->packet_size - stream_get_endp (peer->ibuf);
-
+zlog (peer->log, LOG_INFO, "bgp_read_packet to read %d",readsize);
   /* If size is zero then return. */
   if (! readsize)
     return 0;
@@ -2667,6 +2667,7 @@ bgp_read (struct thread *thread)
       BGP_READ_ON (peer->t_read, bgp_read, peer->fd);
     }
 #ifdef HAVE_IPAUGENBLICK
+zlog_debug ("%s %d, %p %d",__func__,__LINE__,peer->ibuf,peer->status);
     if (!peer->ibuf)
 	goto done;
 #endif

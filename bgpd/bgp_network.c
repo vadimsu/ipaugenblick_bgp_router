@@ -724,11 +724,12 @@ bgp_close (void)
   struct bgp_listener *listener;
 
   for (ALL_LIST_ELEMENTS (bm->listen_sockets, node, next, listener))
-    {
-      thread_cancel (listener->thread);
+    { 
 #ifdef HAVE_IPAUGENBLICK
+      thread_cancel_pmd (listener->thread);
       ipaugenblick_close(listener->fd);
-#else      
+#else
+      thread_cancel (listener->thread);      
       close (listener->fd);
 #endif
       listnode_delete (bm->listen_sockets, listener);
