@@ -341,7 +341,7 @@ main (int argc, char **argv)
 			   LOG_CONS|LOG_NDELAY|LOG_PID, LOG_DAEMON);
 
   char *eal_args[] = { "bgpd","-c", "c", "-n", "1", "--proc-type", "secondary" };
-  if(ipaugenblick_app_init(7,eal_args) != 0) 
+  if(ipaugenblick_app_init(7,eal_args,"quagga_bgpd") != 0) 
     {
         printf("cannot initialize IPAugenblick\n");
         return 1;
