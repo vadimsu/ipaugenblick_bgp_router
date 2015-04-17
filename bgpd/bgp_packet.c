@@ -700,6 +700,7 @@ bgp_write (struct thread *thread)
   peer = THREAD_ARG (thread);
   peer->t_write = NULL;
 #ifdef HAVE_IPAUGENBLICK
+  int send_succeeded = 0;
   peer->io_events_mask |= 0x2;
 #endif
 zlog_debug ("%s %d %d",__func__,__LINE__, peer->status);
@@ -780,7 +781,8 @@ zlog_debug ("%s %d %d",__func__,__LINE__, peer->status);
 			  {
 				zlog (peer->log, LOG_INFO, "kicking socket");
 				ipaugenblick_socket_kick(peer->fd);
-  				peer->io_events_mask &= ~(0x2);
+//  				peer->io_events_mask &= ~(0x2);
+				send_succeeded = 1;
 				if(remained > 0)
 					break;
 			  }
@@ -850,6 +852,10 @@ zlog_debug ("%s %d %d",__func__,__LINE__, peer->status);
   
   if (bgp_write_proceed (peer))
     BGP_WRITE_ON (peer->t_write, bgp_write, peer->fd);
+#ifdef HAVE_IPAUGENBLICK
+  else if(send_succeeded)
+    BGP_WRITE_ON (peer->t_write, bgp_write, peer->fd);
+#endif
 
  done:
 #ifdef HAVE_IPAUGENBLICK
@@ -916,6 +922,8 @@ bgp_write_notify (struct peer *peer)
 				BGP_EVENT_ADD (peer, TCP_fatal_error);
 				return 0;
 			  }
+			else
+				BGP_WRITE_ON (peer->t_write, bgp_write, peer->fd);
 			zlog (peer->log, LOG_INFO, "kicking socket");
 			ipaugenblick_socket_kick(peer->fd);
 	      }
@@ -2649,6 +2657,7 @@ bgp_read (struct thread *thread)
   peer->t_read = NULL;
 #ifdef HAVE_IPAUGENBLICK
   peer->io_events_mask |= 0x1;
+  int rearm = 0;
 #endif
 
   /* For non-blocking IO check. */
@@ -2664,7 +2673,11 @@ bgp_read (struct thread *thread)
 	  zlog_err ("bgp_read peer's fd is negative value %d", peer->fd);
 	  return -1;
 	}
+#ifdef HAVE_IPAUGENBLICK
+	rearm = 1;
+#else
       BGP_READ_ON (peer->t_read, bgp_read, peer->fd);
+#endif
     }
 #ifdef HAVE_IPAUGENBLICK
 zlog_debug ("%s %d, %p %d",__func__,__LINE__,peer->ibuf,peer->status);
@@ -2681,8 +2694,16 @@ zlog_debug ("%s %d, %p %d",__func__,__LINE__,peer->ibuf,peer->status);
       ret = bgp_read_packet (peer);
 
       /* Header read error or partial read packet. */
+#ifdef HAVE_IPAUGENBLICK
+      if (ret < 0)
+	{
+		zlog_err ("bgp_read_packet returned %d, thread type %d",ret, thread->type);
+		goto done;
+	}
+#else
       if (ret < 0) 
 	goto done;
+#endif
 
       /* Get size and type. */
       stream_forward_getp (peer->ibuf, BGP_MARKER_SIZE);
@@ -2751,7 +2772,10 @@ zlog_debug ("%s %d, %p %d",__func__,__LINE__,peer->ibuf,peer->status);
 
   ret = bgp_read_packet (peer);
   if (ret < 0) 
-    goto done;
+    {
+	zlog_err ("%s %d bgp_read_packet returned %d, thread type %d",__func__,__LINE__,ret, thread->type);
+        goto done;
+    }
 
   /* Get size and type again. */
   size = stream_getw_from (peer->ibuf, BGP_MARKER_SIZE);
@@ -2797,6 +2821,10 @@ zlog_debug ("%s %d, %p %d",__func__,__LINE__,peer->ibuf,peer->status);
     stream_reset (peer->ibuf);
 
  done:
+#ifdef HAVE_IPAUGENBLICK
+  if(rearm)
+	BGP_READ_ON (peer->t_read, bgp_read, peer->fd);
+#endif
   if (CHECK_FLAG (peer->sflags, PEER_STATUS_ACCEPT_PEER))
     {
       if (BGP_DEBUG (events, EVENTS))
