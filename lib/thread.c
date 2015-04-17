@@ -756,7 +756,7 @@ funcname_thread_add_read_pmd (struct thread_master *m,
 
   if (FD_ISSET (fd, &m->readfdpmd))
     {
-      zlog (NULL, LOG_WARNING, "There is already read fd [%d]", fd);
+      zlog (NULL, LOG_WARNING, "There is already read fd [%d] pmd", fd);
       return NULL;
     }
   zlog(NULL,LOG_DEBUG, "%s %d %d",__func__,__LINE__,fd);
@@ -781,7 +781,7 @@ funcname_thread_add_write_pmd (struct thread_master *m,
 
   if (FD_ISSET (fd, &m->writefdpmd))
     {
-      zlog (NULL, LOG_WARNING, "There is already write fd [%d]", fd);
+      zlog (NULL, LOG_WARNING, "There is already write fd [%d] pmd", fd);
       return NULL;
     }
   zlog(NULL,LOG_DEBUG, "%s %d %d",__func__,__LINE__,fd);
