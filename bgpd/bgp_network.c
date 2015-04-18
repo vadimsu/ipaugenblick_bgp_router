@@ -500,8 +500,11 @@ bgp_getsockname (struct peer *peer)
     }
   peer->su_local = XCALLOC (MTYPE_SOCKUNION, sizeof (union sockunion));
   peer->su_remote = XCALLOC (MTYPE_SOCKUNION, sizeof (union sockunion));
+  peer->su_local->sa.sa_family = AF_INET;// temporary. need to find better solution
+  peer->su_remote->sa.sa_family = AF_INET;
   ipaugenblick_getsockname(peer->fd,1,&peer->su_local->sin.sin_addr.s_addr,&peer->su_local->sin.sin_port);/* local */
   ipaugenblick_getsockname(peer->fd,0,&peer->su_remote->sin.sin_addr.s_addr,&peer->su_remote->sin.sin_port);
+zlog (peer->log, LOG_INFO, "ADDRESSES remote %x local %x",peer->su_remote->sin.sin_addr.s_addr,peer->su_local->sin.sin_addr.s_addr);
 #else
   if (peer->su_local)
     {
@@ -519,6 +522,7 @@ bgp_getsockname (struct peer *peer)
   peer->su_remote = sockunion_getpeername (peer->fd);
 #endif
   bgp_nexthop_set (peer->su_local, peer->su_remote, &peer->nexthop, peer);
+zlog (peer->log, LOG_INFO, "NEXTHOP %x %p",peer->nexthop.v4.s_addr,peer->nexthop.ifp);
 }
 
 
