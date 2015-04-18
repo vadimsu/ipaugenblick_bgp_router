@@ -522,7 +522,11 @@ bgp_stop (struct peer *peer)
   /* Close of file descriptor. */
   if (peer->fd >= 0)
     {
+#ifdef HAVE_IPAUGENBLICK
+      ipaugenblick_close(peer->fd);
+#else
       close (peer->fd);
+#endif
       peer->fd = -1;
     }
 
