@@ -47,5 +47,7 @@ extern struct interface *if_lookup_by_ipv4_exact (struct in_addr *);
 extern struct interface *if_lookup_by_ipv6 (struct in6_addr *);
 extern struct interface *if_lookup_by_ipv6_exact (struct in6_addr *);
 #endif /* HAVE_IPV6 */
-
+#ifdef HAVE_IPAUGENBLICK
+void bgp_ipaugenblick_on_updates_cbk(unsigned char cmd, unsigned char *buf,int len);
+#endif
 #endif /* _QUAGGA_BGP_ZEBRA_H */

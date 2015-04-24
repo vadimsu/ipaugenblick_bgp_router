@@ -341,11 +341,14 @@ main (int argc, char **argv)
 			   LOG_CONS|LOG_NDELAY|LOG_PID, LOG_DAEMON);
 
   char *eal_args[] = { "bgpd","-c", "c", "-n", "1", "--proc-type", "secondary" };
+#ifdef HAVE_IPAUGENBLICK
   if(ipaugenblick_app_init(7,eal_args,"quagga_bgpd") != 0) 
     {
         printf("cannot initialize IPAugenblick\n");
         return 1;
     }
+    ipaugenblick_create_client(bgp_ipaugenblick_on_updates_cbk);
+#endif
   /* BGP master init. */
   bgp_master_init ();
 
@@ -469,7 +472,9 @@ main (int argc, char **argv)
 	       vty_port, 
 	       (bm->address ? bm->address : "<all>"),
 	       bm->port);
-
+#ifdef HAVE_IPAUGENBLICK
+   while(ipaugenblick_read_updates() == 0);
+#endif
   /* Start finite state machine, here we go! */
   while (thread_fetch (master, &thread))
     thread_call (&thread);

@@ -668,10 +668,10 @@ bgp_zebra_announce (struct prefix *p, struct bgp_info *info, struct bgp *bgp, sa
   struct peer *peer;
   struct bgp_info *mpinfo;
   size_t oldsize, newsize;
-
+#ifndef HAVE_IPAUGENBLICK
   if (zclient->sock < 0)
     return;
-
+#endif
   if (! zclient->redist[ZEBRA_ROUTE_BGP])
     return;
 
@@ -751,9 +751,12 @@ bgp_zebra_announce (struct prefix *p, struct bgp_info *info, struct bgp *bgp, sa
 		       i, inet_ntop(AF_INET, api.nexthop[i], buf[1],
 				    sizeof(buf[1])));
 	}
-
+#ifdef HAVE_IPAUGENBLICK
+	printf("%s %d\n",__FILE__,__LINE__);
+#else
       zapi_ipv4_route (ZEBRA_IPV4_ROUTE_ADD, zclient, 
                        (struct prefix_ipv4 *) p, &api);
+#endif
     }
 #ifdef HAVE_IPV6
   /* We have to think about a IPv6 link-local address curse. */
@@ -820,9 +823,11 @@ bgp_zebra_announce (struct prefix *p, struct bgp_info *info, struct bgp *bgp, sa
 		     inet_ntop(AF_INET6, nexthop, buf[1], sizeof(buf[1])),
 		     api.metric);
 	}
-
+#ifdef HAVE_IPAUGENBLICK
+#else
       zapi_ipv6_route (ZEBRA_IPV6_ROUTE_ADD, zclient, 
                        (struct prefix_ipv6 *) p, &api);
+#endif
     }
 #endif /* HAVE_IPV6 */
 }
@@ -832,10 +837,10 @@ bgp_zebra_withdraw (struct prefix *p, struct bgp_info *info, safi_t safi)
 {
   int flags;
   struct peer *peer;
-
+#ifndef HAVE_IPAUGENBLICK
   if (zclient->sock < 0)
     return;
-
+#endif
   if (! zclient->redist[ZEBRA_ROUTE_BGP])
     return;
 
@@ -879,9 +884,11 @@ bgp_zebra_withdraw (struct prefix *p, struct bgp_info *info, safi_t safi)
 		     inet_ntop(AF_INET, nexthop, buf[1], sizeof(buf[1])),
 		     api.metric);
 	}
-
+#ifdef HAVE_IPAUGENBLICK
+#else
       zapi_ipv4_route (ZEBRA_IPV4_ROUTE_DELETE, zclient, 
                        (struct prefix_ipv4 *) p, &api);
+#endif
     }
 #ifdef HAVE_IPV6
   /* We have to think about a IPv6 link-local address curse. */
@@ -937,9 +944,11 @@ bgp_zebra_withdraw (struct prefix *p, struct bgp_info *info, safi_t safi)
 		     inet_ntop(AF_INET6, nexthop, buf[1], sizeof(buf[1])),
 		     api.metric);
 	}
-
+#ifdef HAVE_IPAUGENBLICK
+#else
       zapi_ipv6_route (ZEBRA_IPV6_ROUTE_DELETE, zclient, 
                        (struct prefix_ipv6 *) p, &api);
+#endif
     }
 #endif /* HAVE_IPV6 */
 }
@@ -1101,3 +1110,27 @@ bgp_zebra_init (void)
 
   bgp_nexthop_buf = stream_new(BGP_NEXTHOP_BUF_SIZE);
 }
+
+#ifdef HAVE_IPAUGENBLICK
+void bgp_ipaugenblick_on_updates_cbk(unsigned char cmd, unsigned char *buf,int len)
+{
+	if(stream_resize(zclient->ibuf,len) < len) 
+	  {
+		return;
+	  }
+//	stream_reset(zclient->ibuf);
+	zclient->ibuf->endp = len;
+	zclient->ibuf->getp = 0;
+	memcpy(zclient->ibuf->data,buf,len);
+	zclient->ibuf->size = len;
+	switch(cmd)
+	  {
+		case ZEBRA_INTERFACE_ADD:
+			bgp_interface_add(cmd,zclient,len);
+		break;
+		case ZEBRA_INTERFACE_ADDRESS_ADD:
+			bgp_interface_address_add(cmd,zclient,len);
+		break;
+	  }
+}
+#endif
