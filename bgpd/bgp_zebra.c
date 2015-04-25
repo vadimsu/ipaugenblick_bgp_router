@@ -707,7 +707,19 @@ bgp_zebra_announce (struct prefix *p, struct bgp_info *info, struct bgp *bgp, sa
     {
       struct zapi_ipv4 api;
       struct in_addr *nexthop;
+#ifdef HAVE_IPAUGENBLICK
+	struct in_addr mask;
+	printf("%s %d\n",__FILE__,__LINE__);
+	masklen2ip(p->prefixlen,&mask);
+	ipaugenblick_add_v4_route(p->u.prefix4.s_addr,mask.s_addr,nexthop->s_addr);
+	for (mpinfo = bgp_info_mpath_first (info); mpinfo;
+	   mpinfo = bgp_info_mpath_next (mpinfo))
+	{
+	  nexthop = &mpinfo->attr->nexthop;
+	  ipaugenblick_add_v4_route(p->u.prefix4.s_addr,mask.s_addr,nexthop->s_addr);
+	}
 
+#else
       api.flags = flags;
       nexthop = &info->attr->nexthop;
       stream_put (bgp_nexthop_buf, &nexthop, sizeof (struct in_addr *));
@@ -751,9 +763,7 @@ bgp_zebra_announce (struct prefix *p, struct bgp_info *info, struct bgp *bgp, sa
 		       i, inet_ntop(AF_INET, api.nexthop[i], buf[1],
 				    sizeof(buf[1])));
 	}
-#ifdef HAVE_IPAUGENBLICK
-	printf("%s %d\n",__FILE__,__LINE__);
-#else
+
       zapi_ipv4_route (ZEBRA_IPV4_ROUTE_ADD, zclient, 
                        (struct prefix_ipv4 *) p, &api);
 #endif
@@ -861,7 +871,15 @@ bgp_zebra_withdraw (struct prefix *p, struct bgp_info *info, safi_t safi)
     {
       struct zapi_ipv4 api;
       struct in_addr *nexthop;
+#ifdef HAVE_IPAUGENBLICK
+      struct in_addr mask;
+      
+      printf("%s %d\n",__FILE__,__LINE__);
+      masklen2ip(p->prefixlen,&mask);
 
+      nexthop = &info->attr->nexthop;
+      ipaugenblick_del_v4_route(p->u.prefix4.s_addr,mask.s_addr,nexthop->s_addr);
+#else
       api.flags = flags;
       nexthop = &info->attr->nexthop;
 
@@ -884,8 +902,7 @@ bgp_zebra_withdraw (struct prefix *p, struct bgp_info *info, safi_t safi)
 		     inet_ntop(AF_INET, nexthop, buf[1], sizeof(buf[1])),
 		     api.metric);
 	}
-#ifdef HAVE_IPAUGENBLICK
-#else
+
       zapi_ipv4_route (ZEBRA_IPV4_ROUTE_DELETE, zclient, 
                        (struct prefix_ipv4 *) p, &api);
 #endif
