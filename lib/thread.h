@@ -91,8 +91,7 @@ struct thread
   int schedfrom_line;
 #ifdef HAVE_IPAUGENBLICK
   int pmd;
-  thread_type repeated_op_type;
-  int pmd_fd;
+  int more_data;
 #endif
 };
 
@@ -133,11 +132,7 @@ enum quagga_clkid {
 
 /* Macros. */
 #define THREAD_ARG(X) ((X)->arg)
-#ifdef HAVE_IPAUGENBLICK
-#define THREAD_FD(X) ((X)->pmd ? (X)->pmd_fd : (X)->u.fd)
-#else
 #define THREAD_FD(X)  ((X)->u.fd)
-#endif
 #define THREAD_VAL(X) ((X)->u.val)
 #ifdef HAVE_IPAUGENBLICK
 #define THREAD_READ_ON_PMD(master,thread,func,arg,sock) \

@@ -585,7 +585,6 @@ thread_add_unuse (struct thread_master *m, struct thread *thread)
   assert (thread->type == THREAD_UNUSED);
 #ifdef HAVE_IPAUGENBLICK
   assert (thread->pmd == 0);
-  assert (thread->repeated_op_type == THREAD_UNUSED);
 #endif
   thread_list_add (&m->unuse, thread);
 }
@@ -695,7 +694,6 @@ thread_get (struct thread_master *m, u_char type,
   thread->schedfrom_line = fromln;
 #ifdef HAVE_IPAUGENBLICK
   thread->pmd = 0;
-  thread->repeated_op_type = THREAD_UNUSED;
 #endif
 
   return thread;
@@ -761,19 +759,6 @@ funcname_thread_add_read_pmd (struct thread_master *m,
   struct thread *thread;
 
   assert (m != NULL);
-#if 0
-  if (FD_ISSET (fd, &m->readfdpmd))
-    {
-      zlog (NULL, LOG_WARNING, "There is already read fd [%d] pmd", fd);
-      return NULL;
-    } 
-  thread = thread_get (m, THREAD_READ, func, arg, debugargpass);
-  zlog(NULL,LOG_DEBUG, "%s %d %d %p",__func__,__LINE__,fd,thread);
-  FD_SET (fd, &m->readfdpmd);
-  thread->pmd_fd = fd;
-  thread->pmd = 1;
-  thread_list_add (&m->read, thread);
-#else
   if (!FD_ISSET (fd, &m->readfdpmd))
     {
       zlog (NULL, LOG_WARNING, "There is already read fd [%d] pmd", fd);
@@ -782,10 +767,8 @@ funcname_thread_add_read_pmd (struct thread_master *m,
   thread = thread_get (m, THREAD_READ, func, arg, debugargpass);
   zlog(NULL,LOG_DEBUG, "%s %d %d %p",__func__,__LINE__,fd,thread);
 //  FD_SET (fd, &m->readfdpmd);
-  thread->pmd_fd = fd;
   thread->pmd = 1;
   thread_list_add (&m->read, thread);
-#endif
   return thread;
 }
 
@@ -798,19 +781,7 @@ funcname_thread_add_write_pmd (struct thread_master *m,
   struct thread *thread;
 
   assert (m != NULL);
-#if 0
-  if (FD_ISSET (fd, &m->writefdpmd))
-    {
-      zlog (NULL, LOG_WARNING, "There is already write fd [%d] pmd", fd);
-      return NULL;
-    }
-  thread = thread_get (m, THREAD_WRITE, func, arg, debugargpass);
-  zlog(NULL,LOG_DEBUG, "%s %d %d %p",__func__,__LINE__,fd,thread);
-  FD_SET (fd, &m->writefdpmd);
-  thread->pmd_fd = fd;
-  thread->pmd = 1;
-  thread_list_add (&m->write, thread);
-#else
+
   if (!FD_ISSET (fd, &m->writefdpmd))
     {
       zlog (NULL, LOG_WARNING, "There is already write fd [%d] pmd", fd);
@@ -818,10 +789,9 @@ funcname_thread_add_write_pmd (struct thread_master *m,
     }
   thread = thread_get (m, THREAD_WRITE, func, arg, debugargpass);
   zlog(NULL,LOG_DEBUG, "%s %d %d %p",__func__,__LINE__,fd,thread);
-  thread->pmd_fd = fd;
   thread->pmd = 1;
   thread_list_add (&m->write, thread);
-#endif
+
   return thread;
 }
 #endif
@@ -948,13 +918,9 @@ zlog(NULL,LOG_DEBUG, "%s %d type %d thread %p fd %d",__func__,__LINE__,thread->t
   switch (thread->type)
     {
     case THREAD_READ:
-      assert (FD_ISSET (thread->pmd_fd, &thread->master->readfdpmd));
-      FD_CLR (thread->pmd_fd, &thread->master->readfdpmd);
       list = &thread->master->read;
       break;
     case THREAD_WRITE:
-      assert (FD_ISSET (thread->pmd_fd, &thread->master->writefdpmd));
-      FD_CLR (thread->pmd_fd, &thread->master->writefdpmd);
       list = &thread->master->write;
       break;
     case THREAD_TIMER:
@@ -968,29 +934,6 @@ zlog(NULL,LOG_DEBUG, "%s %d type %d thread %p fd %d",__func__,__LINE__,thread->t
       break;
     case THREAD_BACKGROUND:
       queue = thread->master->background;
-#ifdef HAVE_IPAUGENBLICK
-      if(thread->pmd)
-	{
-		zlog(NULL,LOG_DEBUG, "%s %d %d",__func__,__LINE__,thread->repeated_op_type);
-		switch(thread->repeated_op_type)
-		  {
-		  case THREAD_READ:
-			if(FD_ISSET (THREAD_FD(thread), &thread->master->readfd))
-		  	  {
-				FD_CLR (THREAD_FD(thread), &thread->master->readfd);
-		  	  }
-		    break;
-		  case THREAD_WRITE:
-			if(FD_ISSET (THREAD_FD(thread), &thread->master->writefd))
-		  	  {
-				FD_CLR (THREAD_FD(thread), &thread->master->writefd);
-		  	  }
-		    break;
-		   default:
-			zlog(NULL,LOG_DEBUG, "%s %d unknown repeated_op_type!!! %d",__func__,__LINE__,thread->repeated_op_type);
-		  }
-	}
-#endif
       break;
     default:
       return;
@@ -1011,10 +954,7 @@ zlog(NULL,LOG_DEBUG, "%s %d type %d thread %p fd %d",__func__,__LINE__,thread->t
     {
       assert(!"Thread should be either in queue or list!");
     }
-#ifdef HAVE_IPAUGENBLICK
   thread->pmd = 0;
-  thread->repeated_op_type = THREAD_UNUSED;
-#endif
   thread->type = THREAD_UNUSED;
   thread_add_unuse (thread->master, thread);
 }
@@ -1052,30 +992,6 @@ thread_cancel (struct thread *thread)
       break;
     case THREAD_BACKGROUND:
       queue = thread->master->background;
-#ifdef HAVE_IPAUGENBLICK
-      if(thread->pmd)
-	{
-		zlog(NULL,LOG_DEBUG, "%s %d %d",__func__,__LINE__,thread->repeated_op_type);
-		switch(thread->repeated_op_type)
-		  {
-		  case THREAD_READ:
-			if(FD_ISSET (thread->u.fd, &thread->master->readfd))
-		  	  {
-				FD_CLR (thread->u.fd, &thread->master->readfd);
-		  	  }
-		    break;
-		  case THREAD_WRITE:
-			if(FD_ISSET (thread->u.fd, &thread->master->writefd))
-		  	  {
-				FD_CLR (thread->u.fd, &thread->master->writefd);
-		  	  }
-		    break;
-		   default:
-			zlog(NULL,LOG_DEBUG, "%s %d unknown repeated_op_type!!! %d",__func__,__LINE__,thread->repeated_op_type);
-		  }
-		  thread->repeated_op_type = THREAD_UNUSED;
-	}
-#endif
       break;
     default:
       return;
@@ -1141,7 +1057,6 @@ thread_cancel_event (struct thread_master *m, void *arg)
           t->type = THREAD_UNUSED;
 #ifdef HAVE_IPAUGENBLICK
   	  t->pmd = 0;
-  	  t->repeated_op_type = THREAD_UNUSED;
 #endif
           thread_add_unuse (m, t);
         }
@@ -1168,7 +1083,6 @@ thread_run (struct thread_master *m, struct thread *thread,
   *fetch = *thread;
   thread->type = THREAD_UNUSED;
 #ifdef HAVE_IPAUGENBLICK
-  thread->repeated_op_type = THREAD_UNUSED;
   thread->pmd = 0;
 #endif
   thread_add_unuse (m, thread);
@@ -1203,6 +1117,32 @@ thread_process_fd (struct thread_list *list, fd_set *fdset, fd_set *mfdset)
     }
   return ready;
 }
+
+#ifdef HAVE_IPAUGENBLICK
+static int
+thread_process_fd_more_data (struct thread_list *list)
+{
+  struct thread *thread;
+  struct thread *next;
+  int ready = 0;
+  
+  assert (list);
+  
+  for (thread = list->head; thread; thread = next)
+    {
+      next = thread->next;
+	  if(thread->more_data)
+	    {
+			  zlog(NULL,LOG_DEBUG, "%s %d %p",__func__,__LINE__,thread);
+	    	  thread_list_delete (list, thread);
+        	  thread_list_add (&thread->master->ready, thread);
+        	  thread->type = THREAD_READY;
+        	  ready++;
+		}
+    }
+  return ready;
+}
+#endif
 
 /* Add all timers that have popped to the ready list. */
 static unsigned int
@@ -1259,6 +1199,10 @@ thread_fetch (struct thread_master *m, struct thread *fetch)
   struct timeval timer_val_bg;
   struct timeval *timer_wait = &timer_val;
   struct timeval *timer_wait_bg;
+#ifdef HAVE_IPAUGENBLICK
+   thread_process_fd_more_data(&m->read);
+   thread_process_fd_more_data(&m->write);
+#endif
 
   while (1)
     {

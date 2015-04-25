@@ -28,20 +28,7 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
   do {						\
     if (!(T) && (peer->status != Deleted))	\
       {						\
-	if(/*peer->io_events_mask & 0x1*/0)		\
-	  {					\
-		printf("%s %s %d\n",__FILE__,__func__,__LINE__); \
-	      T = thread_add_background(master,F,peer,V);	\
-	      T->pmd = 1;			\
-	      T->repeated_op_type = THREAD_READ;	\
-	      if (!FD_ISSET (V, &master->readfdpmd))	\
-    		{					\
-			T->u.fd = V;		\
-  			FD_SET (V, &master->readfdpmd);	\
-		}					\
-	  }					\
-	else					\
-      	  THREAD_READ_ON_PMD(master,T,F,peer,V);	\
+      	       THREAD_READ_ON_PMD(master,T,F,peer,V);	\
       }						\
   } while (0)
 #else
@@ -71,20 +58,7 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
   do {						\
     if (!(T) && (peer->status != Deleted)) 	\
       {						\
-	if(peer->io_events_mask & 0x2)		\
-	  {					\
-		printf("%s %s %d\n",__FILE__,__func__,__LINE__); \
-	      T = thread_add_background(master,F,peer,V);	\
-	      T->pmd = 1;			\
-	      T->repeated_op_type = THREAD_WRITE;	\
-	      if (!FD_ISSET (V, &master->writefdpmd))	\
-    		{					\
-			T->u.fd = V;		\
-  			FD_SET (V, &master->writefdpmd);	\
-		}					\
-	  }					\
-	else					\
-      	  THREAD_WRITE_ON_PMD(master,(T),(F),peer,(V)); \
+      	      THREAD_WRITE_ON_PMD(master,(T),(F),peer,(V)); \
       }						\
   } while (0)
 #else
