@@ -711,6 +711,7 @@ bgp_zebra_announce (struct prefix *p, struct bgp_info *info, struct bgp *bgp, sa
 	struct in_addr mask;
 	printf("%s %d\n",__FILE__,__LINE__);
 	masklen2ip(p->prefixlen,&mask);
+	nexthop = &info->attr->nexthop;
 	ipaugenblick_add_v4_route(p->u.prefix4.s_addr,mask.s_addr,nexthop->s_addr,info->attr->med);
 	for (mpinfo = bgp_info_mpath_first (info); mpinfo;
 	   mpinfo = bgp_info_mpath_next (mpinfo))

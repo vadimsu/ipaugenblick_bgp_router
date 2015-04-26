@@ -414,6 +414,8 @@ bgp_connect (struct peer *peer)
   /* Make socket for the peer. */
 #ifdef HAVE_IPAUGENBLICK
   zlog (peer->log, LOG_INFO, "open socket selector %d",master->selector);
+  peer->more_data_to_receive = 0;
+  peer->more_data_to_transmit = 0;
   peer->fd = ipaugenblick_open_socket(AF_INET,SOCK_STREAM,master->selector);
   zlog (peer->log, LOG_INFO, "fd %d",peer->fd);
 #else

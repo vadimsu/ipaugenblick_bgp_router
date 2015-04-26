@@ -574,6 +574,10 @@ struct peer
 #define PEER_RMAP_TYPE_NOSET          (1 << 5) /* not allow to set commands */
 #define PEER_RMAP_TYPE_IMPORT         (1 << 6) /* neighbor route-map import */
 #define PEER_RMAP_TYPE_EXPORT         (1 << 7) /* neighbor route-map export */
+#ifdef HAVE_IPAUGENBLICK
+    u_char more_data_to_receive;
+    u_char more_data_to_transmit;
+#endif
 };
 
 #define PEER_PASSWORD_MINLEN	(1)

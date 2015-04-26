@@ -701,7 +701,7 @@ bgp_write (struct thread *thread)
   peer->t_write = NULL;
 #ifdef HAVE_IPAUGENBLICK
   int send_succeeded = 0;
-  thread->more_data = 1;
+  peer->more_data_to_transmit = 1;
 #endif
 zlog_debug ("%s %d %d",__func__,__LINE__, peer->status);
   /* For non-blocking IO check. */
@@ -773,7 +773,7 @@ zlog_debug ("%s %d %d",__func__,__LINE__, peer->status);
 	    		if(ipaugenblick_send_bulk(peer->fd,bufs,offsets,lengths,bufnum))
 			  {
 				zlog (peer->log, LOG_INFO, "can't send bulk");
-				thread->more_data = 0;
+				peer->more_data_to_transmit = 0;
 				BGP_EVENT_ADD (peer, TCP_fatal_error);
 				return 0;
 			  }
@@ -918,8 +918,7 @@ bgp_write_notify (struct peer *peer)
 	    		if(ipaugenblick_send_bulk(peer->fd,bufs,offsets,lengths,bufnum))
 			  {
 				zlog (peer->log, LOG_INFO, "cannot send bulk");
-				if(peer->t_write)
-					peer->t_write->more_data = 0;
+			 	peer->more_data_to_transmit = 0;
 				BGP_EVENT_ADD (peer, TCP_fatal_error);
 				return 0;
 			  }
@@ -2559,8 +2558,7 @@ zlog (peer->log, LOG_INFO, "bgp_read_packet to read %d",readsize);
 	  }
 	else
 	  {
-		if(peer->t_read)
-  			peer->t_read->more_data = 0;
+  		peer->more_data_to_receive = 0;
 		nbytes = -2;
 	  }
   }
@@ -2658,7 +2656,7 @@ bgp_read (struct thread *thread)
   peer = THREAD_ARG (thread);
   peer->t_read = NULL;
 #ifdef HAVE_IPAUGENBLICK
-  thread->more_data = 1;
+  peer->more_data_to_receive = 1;
   int rearm = 0;
 #endif
 
