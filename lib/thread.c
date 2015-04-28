@@ -1287,7 +1287,7 @@ thread_fetch (struct thread_master *m, struct thread *fetch)
 #endif
 #ifdef HAVE_IPAUGENBLICK
       unsigned short mask;
-      int ready_sock = ipaugenblick_select(m->selector,&mask,0); 
+      int ready_sock = ipaugenblick_select(m->selector,&mask,timer_wait); 
       struct timeval null_timer_val = { .tv_sec = 0, .tv_usec = 0 };
       num = select (FD_SETSIZE, &readfd, &writefd, &exceptfd, &null_timer_val);
 #else
