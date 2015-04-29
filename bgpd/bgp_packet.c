@@ -703,7 +703,7 @@ bgp_write (struct thread *thread)
   int send_succeeded = 0;
   peer->more_data_to_transmit = 1;
 #endif
-zlog_debug ("%s %d %d",__func__,__LINE__, peer->status);
+zlog_debug ("%s %d %p %d",__func__,__LINE__, thread,peer->fd);
   /* For non-blocking IO check. */
   if (peer->status == Connect)
     {
@@ -736,9 +736,9 @@ zlog_debug ("%s %d %d",__func__,__LINE__, peer->status);
 	    int bufidx;
 	    if(txspace < bufnum)
 		bufnum = txspace;
-	    void **bufs[bufnum];
-	    zlog (peer->log, LOG_INFO, "getting %d bufs in bulk",bufnum);
-	    if(ipaugenblick_get_buffers_bulk(1448,peer->fd,bufnum,bufs)) 
+	    struct data_and_descriptor bufs_and_desc[bufnum];
+	    zlog (peer->log, LOG_INFO, "getting %d bufs in bulk (writenum %d) tx_space %d",bufnum,writenum,txspace);
+	    if(ipaugenblick_get_buffers_bulk(1448,peer->fd,bufnum,bufs_and_desc)) 
 	      {
 		zlog (peer->log, LOG_INFO, "cannot get bulk (%d)",bufnum);
 		BGP_EVENT_ADD (peer, TCP_fatal_error);
@@ -756,12 +756,12 @@ zlog_debug ("%s %d %d",__func__,__LINE__, peer->status);
 				num = remained > 1448 ? 1448 : remained;
 				offsets[bufidx] = 0;
 				lengths[bufidx] = num;
-				memcpy(*bufs[bufidx],STREAM_PNT(s),num);
+				memcpy(bufs_and_desc[bufidx].pdata,STREAM_PNT(s),num);
 			{
 				int j;
 				printf("dump %d bytes\n",num);
 				for(j = 0;j < num;j++){
-					unsigned char *p = (unsigned char *)*bufs[bufidx];
+					unsigned char *p = (unsigned char *)bufs_and_desc[bufidx].pdata;
 					printf("  %x",p[j]);
 				}
 				printf("\n");
@@ -770,7 +770,7 @@ zlog_debug ("%s %d %d",__func__,__LINE__, peer->status);
 				remained -= num;
 	    		  }
 			zlog (peer->log, LOG_INFO, "sending bulk");
-	    		if(ipaugenblick_send_bulk(peer->fd,bufs,offsets,lengths,bufnum))
+	    		if(ipaugenblick_send_bulk(peer->fd,bufs_and_desc,offsets,lengths,bufnum))
 			  {
 				zlog (peer->log, LOG_INFO, "can't send bulk");
 				peer->more_data_to_transmit = 0;
@@ -891,8 +891,8 @@ bgp_write_notify (struct peer *peer)
 		BGP_EVENT_ADD (peer, TCP_fatal_error);
 		return 0;
 	      }
-	    void **bufs[bufnum];
-	    if(ipaugenblick_get_buffers_bulk(1448,peer->fd,bufnum,bufs)) 
+	    struct data_and_descriptor bufs_and_desc[bufnum];
+	    if(ipaugenblick_get_buffers_bulk(1448,peer->fd,bufnum,bufs_and_desc)) 
 	      {
 		zlog (peer->log, LOG_INFO, "can't get buffers bulk");
 		BGP_EVENT_ADD (peer, TCP_fatal_error);
@@ -910,12 +910,12 @@ bgp_write_notify (struct peer *peer)
 				num = remained > 1448 ? 1448 : remained;
 				offsets[bufidx] = 0;
 				lengths[bufidx] = num;
-				memcpy(*bufs[bufidx],STREAM_DATA (s),num);
+				memcpy(bufs_and_desc[bufidx].pdata,STREAM_DATA (s),num);
 				stream_forward_getp (s, num);
 				remained -= num;
 	    		  }
 			zlog (peer->log, LOG_INFO, "sending bulk");
-	    		if(ipaugenblick_send_bulk(peer->fd,bufs,offsets,lengths,bufnum))
+	    		if(ipaugenblick_send_bulk(peer->fd,bufs_and_desc,offsets,lengths,bufnum))
 			  {
 				zlog (peer->log, LOG_INFO, "cannot send bulk");
 			 	peer->more_data_to_transmit = 0;
@@ -2530,31 +2530,29 @@ zlog (peer->log, LOG_INFO, "bgp_read_packet to read %d",readsize);
 #ifdef HAVE_IPAUGENBLICK
   {
 	int len = readsize,bufidx;
-	void **rxbuff;
+	void *rxbuff,*pdesc;
 	int buflen = 0;
 	zlog (peer->log, LOG_INFO, "receiving %d bytes",readsize);
 	nbytes = 0;
-	if(!ipaugenblick_receive(peer->fd,&rxbuff,&len,&buflen))
+	if(!ipaugenblick_receive(peer->fd,&rxbuff,&len,&buflen,&pdesc))
 	  {
-		void *buff;
-		void **bufdesc = rxbuff;
+		void *porigdesc = pdesc;
 		zlog (peer->log, LOG_INFO, "suceeded");
-		while(bufdesc)
+		while(rxbuff)
 	  	{
-		    buff = *bufdesc;
-		    zlog (peer->log, LOG_INFO, "buffer#%d is %p len %d",bufidx,buff,buflen);
+		    zlog (peer->log, LOG_INFO, "buffer#%d is %p len %d",bufidx,rxbuff,buflen);
                     if(buflen > 0) /* API must be changed to return first segment's length!!! */
 		      {	
-                        memcpy((void *)(peer->ibuf->data + peer->ibuf->endp),buff,buflen);
+                        memcpy((void *)(peer->ibuf->data + peer->ibuf->endp),rxbuff,buflen);
 			peer->ibuf->endp += buflen;
 			nbytes += buflen;
                         /* don't release buf, release rxbuff */
                       }
 		      zlog (peer->log, LOG_INFO, "getting next buffer");
-		      bufdesc = ipaugenblick_get_next_buffer_segment(bufdesc,&buflen);
+		      rxbuff = ipaugenblick_get_next_buffer_segment(&pdesc,&buflen);
 	  	}
 		zlog (peer->log, LOG_INFO, "release rxbuff");
-		ipaugenblick_release_rx_buffer(rxbuff,peer->fd);
+		ipaugenblick_release_rx_buffer(porigdesc,peer->fd);
 	  }
 	else
 	  {
