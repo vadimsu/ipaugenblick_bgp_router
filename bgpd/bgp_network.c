@@ -260,6 +260,7 @@ bgp_accept (struct thread *thread)
 		       inet_sutop (&su, buf));
 	}
 #ifdef HAVE_IPAUGENBLICK
+      zlog_debug("%s %d %d",__func__,__LINE__,bgp_sock);
       ipaugenblick_close(bgp_sock);
 #else
       close (bgp_sock);
@@ -432,6 +433,8 @@ bgp_connect (struct peer *peer)
 
   bgp_set_socket_ttl (peer, peer->fd);
 #ifdef HAVE_IPAUGENBLICK
+  int reuse = 1;
+  ipaugenblick_setsockopt(peer->fd,SOL_SOCKET, SO_REUSEADDR,&reuse,sizeof(reuse));
 #else
   sockopt_reuseaddr (peer->fd);
   sockopt_reuseport (peer->fd);  
@@ -534,6 +537,8 @@ bgp_listener (int sock, struct sockaddr *sa, socklen_t salen)
   struct bgp_listener *listener;
   int ret, en;
 #ifdef HAVE_IPAUGENBLICK
+  int reuse = 1;
+  ipaugenblick_setsockopt(sock,SOL_SOCKET, SO_REUSEADDR,&reuse,sizeof(reuse));
 #else
   sockopt_reuseaddr (sock);
   sockopt_reuseport (sock);
@@ -654,6 +659,7 @@ bgp_socket (unsigned short port, const char *address)
 	++count;
       else
 #ifdef HAVE_IPAUGENBLICK
+	zlog_debug("%s %d %d",__func__,__LINE__,sock);
         ipaugenblick_close(sock);
 #else
 	close(sock);
@@ -713,6 +719,7 @@ bgp_socket (unsigned short port, const char *address)
   if (ret < 0) 
     {
 #ifdef HAVE_IPAUGENBLICK
+      zlog_debug("%s %d %d",__func__,__LINE__,sock);
       ipaugenblick_close(sock);
 #else
       close (sock);
@@ -733,6 +740,7 @@ bgp_close (void)
     { 
 #ifdef HAVE_IPAUGENBLICK
       thread_cancel_pmd (listener->thread);
+      zlog_debug("%s %d %d",__func__,__LINE__,listener->fd);
       ipaugenblick_close(listener->fd);
 #else
       thread_cancel (listener->thread);      
