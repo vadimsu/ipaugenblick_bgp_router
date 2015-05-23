@@ -1114,8 +1114,13 @@ thread_process_fd (struct thread_list *list, fd_set *fdset, fd_set *mfdset)
 
       if (FD_ISSET (THREAD_FD (thread), fdset))
         {
-	  zlog(NULL,LOG_DEBUG, "%s %d %p",__func__,__LINE__,thread);
+	  zlog(NULL,LOG_DEBUG, "%s %d %p %d",__func__,__LINE__,thread,THREAD_FD (thread));
+#ifdef HAVE_IPAUGENBLICK
+	  if (!FD_ISSET (THREAD_FD (thread), mfdset)) /* this can happen for VTY, for example */
+		continue;
+#else
           assert (FD_ISSET (THREAD_FD (thread), mfdset));
+#endif
           FD_CLR(THREAD_FD (thread), mfdset);
           thread_list_delete (list, thread);
           thread_list_add (&thread->master->ready, thread);
@@ -1147,7 +1152,8 @@ thread_process_fd_more_data (struct thread_list *list,fd_set *mfdset)
 		  if (FD_ISSET (THREAD_FD (thread), mfdset))
         	    {
 	  	//	zlog(NULL,LOG_DEBUG, "%s %d %p",__func__,__LINE__,thread);
-		        assert (FD_ISSET (THREAD_FD (thread), mfdset));
+		        if (FD_ISSET (THREAD_FD (thread), mfdset))
+				continue;
           		FD_CLR(THREAD_FD (thread), mfdset);
 		    }
 	    	  thread_list_delete (list, thread);
@@ -1326,7 +1332,7 @@ thread_fetch (struct thread_master *m, struct thread *fetch)
 #ifdef HAVE_IPAUGENBLICK
 	if (ready_sock != -1)
 	  {
-		zlog(NULL,LOG_DEBUG, "%s %d %d %x",__func__,__LINE__,ready_sock,mask);
+		zlog(NULL,LOG_DEBUG, "%s %d %d %x %p",__func__,__LINE__,ready_sock,mask,m);
 		if(mask & 0x1)
 		  {
 			FD_SET(ready_sock,&readfdpmd);
