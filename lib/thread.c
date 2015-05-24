@@ -824,7 +824,7 @@ funcname_thread_add_timer_timeval (struct thread_master *m,
   alarm_time.tv_sec = relative_time.tv_sec + time_relative->tv_sec;
   alarm_time.tv_usec = relative_time.tv_usec + time_relative->tv_usec;
   thread->u.sands = timeval_adjust(alarm_time);
-printf("%s %d %p\n",__FILE__,__LINE__,thread);
+
   pqueue_enqueue(thread, queue);
   return thread;
 }
@@ -887,7 +887,6 @@ funcname_thread_add_background (struct thread_master *m,
       trel.tv_sec = 0;
       trel.tv_usec = 0;
     }
-printf("%s %d\n",__FILE__,__LINE__);
   return funcname_thread_add_timer_timeval (m, func, THREAD_BACKGROUND,
                                             arg, &trel, debugargpass);
 }
@@ -1146,14 +1145,11 @@ thread_process_fd_more_data (struct thread_list *list,fd_set *mfdset)
   for (thread = list->head; thread; thread = next)
     {
       next = thread->next;
+//	  zlog(NULL,LOG_DEBUG, "%s %d %p %d",__func__,__LINE__,thread,thread->more_data);
 	  if(thread->more_data)
 	    {
 		  //zlog(NULL,LOG_DEBUG, "%s %d %p",__func__,__LINE__,thread);
-		  if (FD_ISSET (THREAD_FD (thread), mfdset))
-        	    {
-	  	//	zlog(NULL,LOG_DEBUG, "%s %d %p",__func__,__LINE__,thread);
-		        if (FD_ISSET (THREAD_FD (thread), mfdset))
-				continue;
+		  if (FD_ISSET (THREAD_FD (thread), mfdset)) {
           		FD_CLR(THREAD_FD (thread), mfdset);
 		    }
 	    	  thread_list_delete (list, thread);
@@ -1225,7 +1221,7 @@ thread_fetch (struct thread_master *m, struct thread *fetch)
    thread_process_fd_more_data(&m->read,&m->readfdpmd);
    thread_process_fd_more_data(&m->write,&m->writefdpmd);
 #endif
-
+  zlog_debug("%s %d %p\n",__FILE__,__LINE__,m);
   while (1)
     {
       int num = 0;
@@ -1234,9 +1230,12 @@ thread_fetch (struct thread_master *m, struct thread *fetch)
       int snmpblock = 0;
       int fdsetsize;
 #endif 
+#ifdef HAVE_IPAUGENBLICK
+#else
       /* Signals pre-empt everything */
       quagga_sigevent_process ();
-       
+#endif
+      
       /* Drain the ready queue of already scheduled jobs, before scheduling
        * more.
        */
@@ -1370,6 +1369,7 @@ thread_fetch (struct thread_master *m, struct thread *fetch)
       if ((thread = thread_trim_head (&m->ready)) != NULL)
         return thread_run (m, thread, fetch);
     }
+    zlog_debug("%s %d %p\n",__FILE__,__LINE__,m);
 }
 
 unsigned long
