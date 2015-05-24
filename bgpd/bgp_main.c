@@ -437,7 +437,11 @@ main (int argc, char **argv)
 
   /* Initializations. */
   srand (time (NULL));
+#ifdef HAVE_IPAUGENBLICK
+/* we use signals to wake up from pselect */
+#else
   signal_init (master, array_size(bgp_signals), bgp_signals);
+#endif
   zprivs_init (&bgpd_privs);
   cmd_init (1);
   vty_init (master);
@@ -473,7 +477,7 @@ main (int argc, char **argv)
 	       (bm->address ? bm->address : "<all>"),
 	       bm->port);
 #ifdef HAVE_IPAUGENBLICK
-   while(ipaugenblick_read_updates() == 0);
+   while(ipaugenblick_read_updates() != 0);
 #endif
   /* Start finite state machine, here we go! */
   while (thread_fetch (master, &thread))
