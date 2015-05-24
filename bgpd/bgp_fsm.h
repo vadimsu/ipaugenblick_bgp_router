@@ -29,10 +29,10 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
     if (!(T) && (peer->status != Deleted))	\
       {						\
       	       THREAD_READ_ON_PMD(master,T,F,peer,V);	\
-	       T->more_data = peer->more_data_to_receive; \
+	       T->more_data |= peer->more_data_to_receive; \
       }						\
     else					\
-	T->more_data = peer->more_data_to_receive;	\
+	T->more_data |= peer->more_data_to_receive;	\
   } while (0)
 #else
 #define BGP_READ_ON(T,F,V)			\
@@ -62,10 +62,10 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
     if (!(T) && (peer->status != Deleted)) 	\
       {						\
       	      THREAD_WRITE_ON_PMD(master,(T),(F),peer,(V)); \
-	      T->more_data = peer->more_data_to_transmit; \
+	      T->more_data |= peer->more_data_to_transmit; \
       }						\
     else					\
-	T->more_data = peer->more_data_to_transmit;	\
+	T->more_data |= peer->more_data_to_transmit;	\
   } while (0)
 #else
 #define BGP_WRITE_ON(T,F,V)			\
