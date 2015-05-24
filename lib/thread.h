@@ -92,6 +92,7 @@ struct thread
 #ifdef HAVE_IPAUGENBLICK
   int pmd;
   int more_data;
+  int io_error;
 #endif
 };
 

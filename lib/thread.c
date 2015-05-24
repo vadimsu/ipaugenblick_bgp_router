@@ -962,6 +962,7 @@ zlog(NULL,LOG_DEBUG, "%s %d type %d thread %p fd %d master %p %d",__func__,__LIN
     }
   thread->pmd = 0;
   thread->more_data = 0;
+  thread->io_error = 0;
   thread->type = THREAD_UNUSED;
   thread_add_unuse (thread->master, thread);
 }
@@ -1065,6 +1066,7 @@ thread_cancel_event (struct thread_master *m, void *arg)
 #ifdef HAVE_IPAUGENBLICK
   	  t->pmd = 0;
 	  t->more_data = 0;
+	  t->io_error = 0;
 #endif
           thread_add_unuse (m, t);
         }
@@ -1099,7 +1101,7 @@ thread_run (struct thread_master *m, struct thread *thread,
 }
 
 static int
-thread_process_fd (struct thread_list *list, fd_set *fdset, fd_set *mfdset, int is_pmd)
+thread_process_fd (struct thread_list *list, fd_set *fdset, fd_set *mfdset, int is_pmd, int is_error)
 {
   struct thread *thread;
   struct thread *next;
@@ -1116,7 +1118,7 @@ thread_process_fd (struct thread_list *list, fd_set *fdset, fd_set *mfdset, int 
 
       if (FD_ISSET (THREAD_FD (thread), fdset))
         {
-	  zlog(NULL,LOG_DEBUG, "%s %d %p %d",__func__,__LINE__,thread,THREAD_FD (thread));
+	  zlog(NULL,LOG_DEBUG, "%s %d %p %d is_error %d",__func__,__LINE__,thread,THREAD_FD (thread), is_error);
 #ifdef HAVE_IPAUGENBLICK
 	  if (!FD_ISSET (THREAD_FD (thread), mfdset)) /* this can happen for VTY, for example */
 		continue;
@@ -1127,6 +1129,7 @@ thread_process_fd (struct thread_list *list, fd_set *fdset, fd_set *mfdset, int 
           thread_list_delete (list, thread);
           thread_list_add (&thread->master->ready, thread);
           thread->type = THREAD_READY;
+	  thread->io_error = is_error;
           ready++;
         }
 	else
@@ -1339,22 +1342,22 @@ thread_fetch (struct thread_master *m, struct thread *fetch)
 		  {
 			FD_SET(ready_sock,&readfdpmd);
 			zlog(NULL,LOG_DEBUG, "%s %d %d",__func__,__LINE__,ready_sock);
-		  	thread_process_fd (&m->read, &readfdpmd, &m->readfdpmd, 1);
+		  	thread_process_fd (&m->read, &readfdpmd, &m->readfdpmd, 1, mask & 0x4);
 		  }
 		if(mask & 0x2)
 		  {
 			  FD_SET(ready_sock,&writefdpmd);
 			  zlog(NULL,LOG_DEBUG, "%s %d %d",__func__,__LINE__,ready_sock);
-			  thread_process_fd (&m->write, &writefdpmd, &m->writefdpmd, 1);
+			  thread_process_fd (&m->write, &writefdpmd, &m->writefdpmd, 1, mask & 0x4);
 		  }
 	    }
 #endif
       if (num > 0)
         {
           /* Normal priority read thead. */
-          thread_process_fd (&m->read, &readfd, &m->readfd, 0);
+          thread_process_fd (&m->read, &readfd, &m->readfd, 0, 0);
           /* Write thead. */
-          thread_process_fd (&m->write, &writefd, &m->writefd, 0);
+          thread_process_fd (&m->write, &writefd, &m->writefd, 0, 0);
         }
 
 #if 0

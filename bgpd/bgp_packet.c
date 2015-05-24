@@ -701,6 +701,10 @@ bgp_write (struct thread *thread)
   peer->t_write = NULL;
 #ifdef HAVE_IPAUGENBLICK
   int send_succeeded = 0;
+  if (thread->io_error) {
+	BGP_EVENT_ADD (peer, TCP_fatal_error);
+	return 0;
+  }
   peer->more_data_to_transmit = 1;
 #endif
 zlog_debug ("%s %d %p %d",__func__,__LINE__, thread,peer->fd);
@@ -2658,6 +2662,10 @@ bgp_read (struct thread *thread)
   peer = THREAD_ARG (thread);
   peer->t_read = NULL;
 #ifdef HAVE_IPAUGENBLICK
+  if (thread->io_error) {
+	BGP_EVENT_ADD (peer, TCP_fatal_error);
+	return 0;
+  }
   peer->more_data_to_receive = 1;
   int rearm = 0;
 #endif
