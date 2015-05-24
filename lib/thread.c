@@ -1099,7 +1099,7 @@ thread_run (struct thread_master *m, struct thread *thread,
 }
 
 static int
-thread_process_fd (struct thread_list *list, fd_set *fdset, fd_set *mfdset)
+thread_process_fd (struct thread_list *list, fd_set *fdset, fd_set *mfdset, int is_pmd)
 {
   struct thread *thread;
   struct thread *next;
@@ -1110,6 +1110,9 @@ thread_process_fd (struct thread_list *list, fd_set *fdset, fd_set *mfdset)
   for (thread = list->head; thread; thread = next)
     {
       next = thread->next;
+
+      if (thread->pmd != is_pmd)
+	    continue;
 
       if (FD_ISSET (THREAD_FD (thread), fdset))
         {
@@ -1336,22 +1339,22 @@ thread_fetch (struct thread_master *m, struct thread *fetch)
 		  {
 			FD_SET(ready_sock,&readfdpmd);
 			zlog(NULL,LOG_DEBUG, "%s %d %d",__func__,__LINE__,ready_sock);
-		  	thread_process_fd (&m->read, &readfdpmd, &m->readfdpmd);
+		  	thread_process_fd (&m->read, &readfdpmd, &m->readfdpmd, 1);
 		  }
 		if(mask & 0x2)
 		  {
 			  FD_SET(ready_sock,&writefdpmd);
 			  zlog(NULL,LOG_DEBUG, "%s %d %d",__func__,__LINE__,ready_sock);
-			  thread_process_fd (&m->write, &writefdpmd, &m->writefdpmd);
+			  thread_process_fd (&m->write, &writefdpmd, &m->writefdpmd, 1);
 		  }
 	    }
 #endif
       if (num > 0)
         {
           /* Normal priority read thead. */
-          thread_process_fd (&m->read, &readfd, &m->readfd);
+          thread_process_fd (&m->read, &readfd, &m->readfd, 0);
           /* Write thead. */
-          thread_process_fd (&m->write, &writefd, &m->writefd);
+          thread_process_fd (&m->write, &writefd, &m->writefd, 0);
         }
 
 #if 0
