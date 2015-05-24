@@ -1597,6 +1597,10 @@ bgp_open_receive (struct peer *peer, bgp_size_t size)
 
       /* Transfer status. */
       realpeer->status = peer->status;
+#ifdef HAVE_IPAUGENBLICK
+      realpeer->more_data_to_receive = peer->more_data_to_receive;
+      realpeer->more_data_to_transmit = peer->more_data_to_transmit;
+#endif
       bgp_stop (peer);
       
       /* peer pointer change. Open packet send to neighbor. */
@@ -2563,7 +2567,7 @@ zlog (peer->log, LOG_INFO, "bgp_read_packet to read %d",readsize);
 #else
   nbytes = stream_read_try (peer->ibuf, peer->fd, readsize);
 #endif
-
+zlog_debug("%s %d nbytes %d",__FILE__,__LINE__,nbytes);
   /* If read byte is smaller than zero then error occured. */
   if (nbytes < 0) 
     {
@@ -2614,7 +2618,7 @@ zlog (peer->log, LOG_INFO, "bgp_read_packet to read %d",readsize);
   /* We read partial packet. */
   if (stream_get_endp (peer->ibuf) != peer->packet_size)
     return -1;
-
+zlog_debug("%s %d",__FILE__,__LINE__);
   return 0;
 }
 
