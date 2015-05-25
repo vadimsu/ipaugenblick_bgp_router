@@ -2832,7 +2832,7 @@ zlog_debug ("%s %d, %p %d",__func__,__LINE__,peer->ibuf,peer->status);
 
  done:
 #ifdef HAVE_IPAUGENBLICK
-  if(rearm)
+  if((rearm)&&(peer->fd != -1))
 	BGP_READ_ON (peer->t_read, bgp_read, peer->fd);
 #endif
   if (CHECK_FLAG (peer->sflags, PEER_STATUS_ACCEPT_PEER))
