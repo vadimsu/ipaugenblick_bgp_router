@@ -5,7 +5,7 @@ DEFS = @DEFS@ -DSYSCONFDIR=\"$(sysconfdir)/\"
 INSTALL_SDATA=@INSTALL@ -m 600
 
 AM_CFLAGS = $(PICFLAGS)
-AM_LDFLAGS = $(PILDFLAGS)
+AM_LDFLAGS = $(PILDFLAGS) -L/usr/lib/ipaugenblick
 
 noinst_LIBRARIES = librip.a
 sbin_PROGRAMS = ripd
@@ -20,7 +20,7 @@ noinst_HEADERS = \
 ripd_SOURCES = \
 	rip_main.c $(librip_a_SOURCES)
 
-ripd_LDADD = ../lib/libzebra.la @LIBCAP@
+ripd_LDADD = ../lib/libzebra.la @LIBCAP@ -lipaugenblickservice -lrte_eal -lrte_mempool -lrte_ring -lrte_malloc -lrte_timer -ldl
 
 examplesdir = $(exampledir)
 dist_examples_DATA = ripd.conf.sample

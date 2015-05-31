@@ -19,8 +19,8 @@ ospfclient_SOURCES = \
 	ospfclient.c
 
 ospfclient_LDADD = libospfapiclient.la \
-	../ospfd/libospf.la ../lib/libzebra.la @LIBCAP@
+	../ospfd/libospf.la ../lib/libzebra.la @LIBCAP@ -lipaugenblickservice -lrte_eal -lrte_mempool -lrte_ring -lrte_malloc -lrte_timer -ldl
 
 ospfclient_CFLAGS = $(AM_CFLAGS) $(PICFLAGS)
-ospfclient_LDFLAGS = $(AM_LDFLAGS) $(PILDFLAGS)
+ospfclient_LDFLAGS = $(AM_LDFLAGS) $(PILDFLAGS) -L/usr/lib/ipaugenblick
 

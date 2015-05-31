@@ -509,7 +509,7 @@ bgp_getsockname (struct peer *peer)
   peer->su_remote->sa.sa_family = AF_INET;
   ipaugenblick_getsockname(peer->fd,1,&peer->su_local->sin.sin_addr.s_addr,&peer->su_local->sin.sin_port);/* local */
   ipaugenblick_getsockname(peer->fd,0,&peer->su_remote->sin.sin_addr.s_addr,&peer->su_remote->sin.sin_port);
-zlog (peer->log, LOG_INFO, "ADDRESSES remote %x local %x",peer->su_remote->sin.sin_addr.s_addr,peer->su_local->sin.sin_addr.s_addr);
+zlog (peer->log, LOG_INFO, "ADDRESSES remote %x local %x fd %d",peer->su_remote->sin.sin_addr.s_addr,peer->su_local->sin.sin_addr.s_addr,peer->fd);
 #else
   if (peer->su_local)
     {

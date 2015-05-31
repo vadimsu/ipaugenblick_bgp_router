@@ -21,7 +21,7 @@ othersrc = zebra_fpm_netlink.c
 endif
 
 AM_CFLAGS = $(PICFLAGS)
-AM_LDFLAGS = $(PILDFLAGS)
+AM_LDFLAGS = $(PILDFLAGS) -L/usr/lib/ipaugenblick
 
 sbin_PROGRAMS = zebra
 

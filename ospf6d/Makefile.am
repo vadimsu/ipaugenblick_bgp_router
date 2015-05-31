@@ -5,7 +5,7 @@ DEFS = @DEFS@ -DSYSCONFDIR=\"$(sysconfdir)/\"
 INSTALL_SDATA=@INSTALL@ -m 600
 
 AM_CFLAGS = $(PICFLAGS)
-AM_LDFLAGS = $(PILDFLAGS)
+AM_LDFLAGS = $(PILDFLAGS) -L/usr/lib/ipaugenblick
 
 noinst_LIBRARIES = libospf6.a
 sbin_PROGRAMS = ospf6d
@@ -27,7 +27,7 @@ noinst_HEADERS = \
 ospf6d_SOURCES = \
 	ospf6_main.c $(libospf6_a_SOURCES)
 
-ospf6d_LDADD = ../lib/libzebra.la @LIBCAP@
+ospf6d_LDADD = ../lib/libzebra.la @LIBCAP@ -lipaugenblickservice -lrte_eal -lrte_mempool -lrte_ring -lrte_malloc -lrte_timer -ldl
 
 examplesdir = $(exampledir)
 dist_examples_DATA = ospf6d.conf.sample

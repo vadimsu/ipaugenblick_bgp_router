@@ -5,7 +5,7 @@ DEFS = @DEFS@ -DSYSCONFDIR=\"$(sysconfdir)/\"
 INSTALL_SDATA=@INSTALL@ -m 600
 
 AM_CFLAGS = $(PICFLAGS)
-AM_LDFLAGS = $(PILDFLAGS)
+AM_LDFLAGS = $(PILDFLAGS) -L/usr/lib/ipaugenblick
 
 noinst_LIBRARIES = libbabel.a
 sbin_PROGRAMS = babeld
@@ -23,7 +23,7 @@ noinst_HEADERS = \
 babeld_SOURCES = \
 	babel_main.c $(libbabel_a_SOURCES)
 
-babeld_LDADD = ../lib/libzebra.la @LIBCAP@
+babeld_LDADD = ../lib/libzebra.la @LIBCAP@ -lipaugenblickservice -lrte_eal -lrte_mempool -lrte_ring -lrte_malloc -lrte_timer -ldl
 
 examplesdir = $(exampledir)
 dist_examples_DATA = babeld.conf.sample

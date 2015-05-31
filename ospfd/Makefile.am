@@ -28,8 +28,8 @@ noinst_HEADERS = \
 	ospf_flood.h ospf_snmp.h ospf_te.h ospf_vty.h ospf_apiserver.h
 
 ospfd_SOURCES = ospf_main.c
-
-ospfd_LDADD = libospf.la ../lib/libzebra.la @LIBCAP@
+ospfd_LDFLAGS = -L/usr/lib/ipaugenblick
+ospfd_LDADD = libospf.la ../lib/libzebra.la @LIBCAP@ -lipaugenblickservice -lrte_eal -lrte_mempool -lrte_ring -lrte_malloc -lrte_timer -ldl
 
 EXTRA_DIST = OSPF-MIB.txt OSPF-TRAP-MIB.txt ChangeLog.opaque.txt
 

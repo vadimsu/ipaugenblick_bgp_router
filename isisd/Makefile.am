@@ -7,7 +7,7 @@ INSTALL_SDATA=@INSTALL@ -m 600
 LIBS = @LIBS@ 
 
 AM_CFLAGS = $(PICFLAGS)
-AM_LDFLAGS = $(PILDFLAGS)
+AM_LDFLAGS = $(PILDFLAGS) -L/usr/lib/ipaugenblick
 
 noinst_LIBRARIES = libisis.a
 sbin_PROGRAMS = isisd 
@@ -31,7 +31,7 @@ isisd_SOURCES = \
 	isis_main.c $(libisis_a_SOURCES) \
 	isis_bpf.c isis_dlpi.c isis_pfpacket.c
 
-isisd_LDADD = @ISIS_TOPOLOGY_LIB@ ../lib/libzebra.la @LIBCAP@
+isisd_LDADD = @ISIS_TOPOLOGY_LIB@ ../lib/libzebra.la @LIBCAP@ -lipaugenblickservice -lrte_eal -lrte_mempool -lrte_ring -lrte_malloc -lrte_timer -ldl
 
 examplesdir = $(exampledir)
 dist_examples_DATA = isisd.conf.sample
