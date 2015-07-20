@@ -23,6 +23,9 @@
 #define _ZEBRA_THREAD_H
 
 #include <zebra.h>
+#ifdef HAVE_IPAUGENBLICK
+#include <ipaugenblick_api.h>
+#endif
 
 struct rusage_t
 {
@@ -58,8 +61,9 @@ struct thread_master
   fd_set readfd;
   fd_set writefd;
 #ifdef HAVE_IPAUGENBLICK
-  fd_set readfdpmd;
-  fd_set writefdpmd;
+  struct ipaugenblick_fdset readfdpmd;
+  struct ipaugenblick_fdset writefdpmd;
+  struct ipaugenblick_fdset excfdpmd;
   int selector;
 #endif
   fd_set exceptfd;
@@ -91,7 +95,6 @@ struct thread
   int schedfrom_line;
 #ifdef HAVE_IPAUGENBLICK
   int pmd;
-  int more_data;
   int io_error;
 #endif
 };

@@ -44,9 +44,6 @@ extern int agentx_enabled;
 #include <mach/mach.h>
 #include <mach/mach_time.h>
 #endif
-#ifdef HAVE_IPAUGENBLICK
-#include <ipaugenblick_api.h>
-#endif
 
 /* Recent absolute time of day */
 struct timeval recent_time;
@@ -540,6 +537,11 @@ thread_master_create ()
   rv->background = pqueue_create();
   rv->timer->cmp = rv->background->cmp = thread_timer_cmp;
   rv->timer->update = rv->background->update = thread_timer_update;
+#ifdef HAVE_IPAUGENBLICK
+  ipaugenblick_fdzero(&rv->readfdpmd,0x1);
+  ipaugenblick_fdzero(&rv->writefdpmd,0x2);
+  ipaugenblick_fdzero(&rv->excfdpmd,0x4);
+#endif
 
   return rv;
 }
@@ -759,14 +761,9 @@ funcname_thread_add_read_pmd (struct thread_master *m,
   struct thread *thread;
 
   assert (m != NULL);
-  if (FD_ISSET (fd, &m->readfdpmd))
-    {
-      zlog (NULL, LOG_WARNING, "There is already read fd [%d] pmd", fd); 
-      return NULL;
-    } 
   thread = thread_get (m, THREAD_READ, func, arg, debugargpass);
   zlog(NULL,LOG_DEBUG, "%s %d fd %d thread %p master %p",__func__,__LINE__,fd,thread,m);
-  FD_SET (fd, &m->readfdpmd);
+  ipaugenblick_fdset (fd, &m->readfdpmd,0x1);
   thread->u.fd = fd;
   thread->pmd = 1;
   thread_list_add (&m->read, thread);
@@ -783,14 +780,9 @@ funcname_thread_add_write_pmd (struct thread_master *m,
 
   assert (m != NULL);
 
-  if (FD_ISSET (fd, &m->writefdpmd))
-    {
-      zlog (NULL, LOG_WARNING, "There is already write fd [%d] pmd", fd);
-      return NULL; 
-    }
   thread = thread_get (m, THREAD_WRITE, func, arg, debugargpass);
   zlog(NULL,LOG_DEBUG, "%s %d fd %d thread %p master %p",__func__,__LINE__,fd,thread,m);
-  FD_SET (fd, &m->writefdpmd);
+  ipaugenblick_fdset (fd, &m->writefdpmd,0x2);
   thread->u.fd = fd;
   thread->pmd = 1;
   thread_list_add (&m->write, thread);
@@ -920,13 +912,11 @@ zlog(NULL,LOG_DEBUG, "%s %d type %d thread %p fd %d master %p %d",__func__,__LIN
   switch (thread->type)
     {
     case THREAD_READ:
-      assert (FD_ISSET (thread->u.fd, &thread->master->readfdpmd));
-      FD_CLR (thread->u.fd, &thread->master->readfdpmd);
+      ipaugenblick_fdclear (thread->u.fd, &thread->master->readfdpmd,0x1);
       list = &thread->master->read;
       break;
     case THREAD_WRITE:
-      assert (FD_ISSET (thread->u.fd, &thread->master->writefdpmd));
-      FD_CLR (thread->u.fd, &thread->master->writefdpmd);
+      ipaugenblick_fdclear  (thread->u.fd, &thread->master->writefdpmd,0x2);
       list = &thread->master->write;
       break;
     case THREAD_TIMER:
@@ -961,7 +951,6 @@ zlog(NULL,LOG_DEBUG, "%s %d type %d thread %p fd %d master %p %d",__func__,__LIN
       assert(!"Thread should be either in queue or list!");
     }
   thread->pmd = 0;
-  thread->more_data = 0;
   thread->io_error = 0;
   thread->type = THREAD_UNUSED;
   thread_add_unuse (thread->master, thread);
@@ -1065,7 +1054,6 @@ thread_cancel_event (struct thread_master *m, void *arg)
           t->type = THREAD_UNUSED;
 #ifdef HAVE_IPAUGENBLICK
   	  t->pmd = 0;
-	  t->more_data = 0;
 	  t->io_error = 0;
 #endif
           thread_add_unuse (m, t);
@@ -1094,12 +1082,38 @@ thread_run (struct thread_master *m, struct thread *thread,
   thread->type = THREAD_UNUSED;
 #ifdef HAVE_IPAUGENBLICK
   thread->pmd = 0;
-  thread->more_data = 0;
 #endif
   thread_add_unuse (m, thread);
   return fetch;
 }
+#ifdef HAVE_IPAUGENBLICK
+static int
+thread_process_fd_pmd (struct thread_list *list, struct ipaugenblick_fdset *mfdset, int mask, int is_error)
+{
+  struct thread *thread;
+  struct thread *next;
+  int ready = 0;
+  
+  assert (list);
+  
+  for (thread = list->head; thread; thread = next)
+    {
+      next = thread->next;
 
+      if (!ipaugenblick_fdisset(THREAD_FD(thread), mfdset)) {
+	continue;
+      }
+      zlog(NULL,LOG_DEBUG, "%s %d %p %d is_error %d",__func__,__LINE__,thread,THREAD_FD (thread), is_error);
+      ipaugenblick_fdclear(THREAD_FD (thread), mfdset,mask);
+      thread_list_delete (list, thread);
+      thread_list_add (&thread->master->ready, thread);
+      thread->type = THREAD_READY;
+      thread->io_error = is_error;
+      ready++;
+    }
+  return ready;
+}
+#endif
 static int
 thread_process_fd (struct thread_list *list, fd_set *fdset, fd_set *mfdset, int is_pmd, int is_error)
 {
@@ -1120,8 +1134,7 @@ thread_process_fd (struct thread_list *list, fd_set *fdset, fd_set *mfdset, int 
         {
 	  zlog(NULL,LOG_DEBUG, "%s %d %p %d is_error %d",__func__,__LINE__,thread,THREAD_FD (thread), is_error);
 #ifdef HAVE_IPAUGENBLICK
-	  if (!FD_ISSET (THREAD_FD (thread), mfdset)) /* this can happen for VTY, for example */
-		continue;
+	  assert (thread->pmd == 0);
 #else
           assert (FD_ISSET (THREAD_FD (thread), mfdset));
 #endif
@@ -1137,36 +1150,6 @@ thread_process_fd (struct thread_list *list, fd_set *fdset, fd_set *mfdset, int 
     }
   return ready;
 }
-
-#ifdef HAVE_IPAUGENBLICK
-static int
-thread_process_fd_more_data (struct thread_list *list,fd_set *mfdset)
-{
-  struct thread *thread;
-  struct thread *next;
-  int ready = 0;
-  
-  assert (list);
-  
-  for (thread = list->head; thread; thread = next)
-    {
-      next = thread->next;
-//	  zlog(NULL,LOG_DEBUG, "%s %d %p %d",__func__,__LINE__,thread,thread->more_data);
-	  if(thread->more_data)
-	    {
-		  //zlog(NULL,LOG_DEBUG, "%s %d %p",__func__,__LINE__,thread);
-		  if (FD_ISSET (THREAD_FD (thread), mfdset)) {
-          		FD_CLR(THREAD_FD (thread), mfdset);
-		    }
-	    	  thread_list_delete (list, thread);
-        	  thread_list_add (&thread->master->ready, thread);
-        	  thread->type = THREAD_READY;
-        	  ready++;
-		}
-    }
-  return ready;
-}
-#endif
 
 /* Add all timers that have popped to the ready list. */
 static unsigned int
@@ -1212,10 +1195,6 @@ struct thread *
 thread_fetch (struct thread_master *m, struct thread *fetch)
 {
   struct thread *thread;
-#ifdef HAVE_IPAUGENBLICK
-  fd_set readfdpmd;
-  fd_set writefdpmd;
-#endif
   fd_set readfd;
   fd_set writefd;
   fd_set exceptfd;
@@ -1223,11 +1202,7 @@ thread_fetch (struct thread_master *m, struct thread *fetch)
   struct timeval timer_val_bg;
   struct timeval *timer_wait = &timer_val;
   struct timeval *timer_wait_bg;
-#ifdef HAVE_IPAUGENBLICK
-   thread_process_fd_more_data(&m->read,&m->readfdpmd);
-   thread_process_fd_more_data(&m->write,&m->writefdpmd);
-#endif
-  zlog_debug("%s %d %p\n",__FILE__,__LINE__,m);
+
   while (1)
     {
       int num = 0;
@@ -1260,10 +1235,6 @@ thread_fetch (struct thread_master *m, struct thread *fetch)
       readfd = m->readfd;
       writefd = m->writefd;
       exceptfd = m->exceptfd;
-#ifdef HAVE_IPAUGENBLICK
-      FD_ZERO(&writefdpmd);
-      FD_ZERO(&readfdpmd);
-#endif     
       /* Calculate select wait timer if nothing else to do */
       if (m->ready.count == 0)
         {
@@ -1297,9 +1268,12 @@ thread_fetch (struct thread_master *m, struct thread *fetch)
         }
 #endif
 #ifdef HAVE_IPAUGENBLICK
-      unsigned short mask;
-      int ready_sock = ipaugenblick_select(m->selector,&mask,timer_wait); 
-      struct timeval null_timer_val = { .tv_sec = 0, .tv_usec = 0 };
+      struct ipaugenblick_fdset readfdpmd = m->readfdpmd;
+      struct ipaugenblick_fdset writefdpmd = m->writefdpmd;
+      struct ipaugenblick_fdset excfdpmd = m->excfdpmd;
+      //zlog(NULL,LOG_DEBUG, "%s %d %d",__func__,__LINE__,THREAD_FD(m));
+      int ready_sock = ipaugenblick_select(m->selector,&readfdpmd,&writefdpmd,&excfdpmd,timer_wait); 
+      struct timeval null_timer_val = { .tv_sec = 0, .tv_usec = 0 }; 
       num = select (FD_SETSIZE, &readfd, &writefd, &exceptfd, &null_timer_val);
 #else
       num = select (FD_SETSIZE, &readfd, &writefd, &exceptfd,timer_wait );
@@ -1335,21 +1309,13 @@ thread_fetch (struct thread_master *m, struct thread *fetch)
       
       /* Got IO, process it */
 #ifdef HAVE_IPAUGENBLICK
-	if (ready_sock != -1)
+	if (ready_sock > 0)
 	  {
-		zlog(NULL,LOG_DEBUG, "%s %d %d %x %p",__func__,__LINE__,ready_sock,mask,m);
-		if(mask & 0x1)
-		  {
-			FD_SET(ready_sock,&readfdpmd);
-			zlog(NULL,LOG_DEBUG, "%s %d %d",__func__,__LINE__,ready_sock);
-		  	thread_process_fd (&m->read, &readfdpmd, &m->readfdpmd, 1, mask & 0x4);
-		  }
-		if(mask & 0x2)
-		  {
-			  FD_SET(ready_sock,&writefdpmd);
-			  zlog(NULL,LOG_DEBUG, "%s %d %d",__func__,__LINE__,ready_sock);
-			  thread_process_fd (&m->write, &writefdpmd, &m->writefdpmd, 1, mask & 0x4);
-		  }
+		//printf("%s %d %d\n",__func__,__LINE__,ready_sock);
+		  thread_process_fd_pmd (&m->read, &readfdpmd,0x1,0);
+		  thread_process_fd_pmd (&m->write, &writefdpmd,0x2,0);
+//		  m->readfdpmd.returned_idx = 0;
+//		  m->writefdpmd.returned_idx = 0;
 	    }
 #endif
       if (num > 0)

@@ -705,7 +705,6 @@ bgp_write (struct thread *thread)
 	BGP_EVENT_ADD (peer, TCP_fatal_error);
 	return 0;
   }
-  peer->more_data_to_transmit = 1;
 #endif
 zlog_debug ("%s %d %p %d",__func__,__LINE__, thread,peer->fd);
   /* For non-blocking IO check. */
@@ -716,9 +715,11 @@ zlog_debug ("%s %d %p %d",__func__,__LINE__, thread,peer->fd);
       return 0;
     }
 
-  s = bgp_write_packet (peer);
-  if (!s)
+  s = bgp_write_packet (peer); 
+  if (!s) {
+    printf("%s %d\n",__FILE__,__LINE__);
     return 0;	/* nothing to send */
+}
 #ifdef HAVE_IPAUGENBLICK
 #else
   sockopt_cork (peer->fd, 1);
@@ -777,7 +778,6 @@ zlog_debug ("%s %d %p %d",__func__,__LINE__, thread,peer->fd);
 	    		if(ipaugenblick_send_bulk(peer->fd,bufs_and_desc,offsets,lengths,bufnum))
 			  {
 				zlog (peer->log, LOG_INFO, "can't send bulk");
-				peer->more_data_to_transmit = 0;
 				BGP_EVENT_ADD (peer, TCP_fatal_error);
 				return 0;
 			  }
@@ -922,7 +922,6 @@ bgp_write_notify (struct peer *peer)
 	    		if(ipaugenblick_send_bulk(peer->fd,bufs_and_desc,offsets,lengths,bufnum))
 			  {
 				zlog (peer->log, LOG_INFO, "cannot send bulk");
-			 	peer->more_data_to_transmit = 0;
 				BGP_EVENT_ADD (peer, TCP_fatal_error);
 				return 0;
 			  }
@@ -1601,10 +1600,6 @@ bgp_open_receive (struct peer *peer, bgp_size_t size)
 
       /* Transfer status. */
       realpeer->status = peer->status;
-#ifdef HAVE_IPAUGENBLICK
-      realpeer->more_data_to_receive = peer->more_data_to_receive;
-      realpeer->more_data_to_transmit = peer->more_data_to_transmit;
-#endif
       bgp_stop (peer);
       
       /* peer pointer change. Open packet send to neighbor. */
@@ -2564,7 +2559,6 @@ zlog (peer->log, LOG_INFO, "bgp_read_packet to read %d",readsize);
 	  }
 	else
 	  {
-  		peer->more_data_to_receive = 0;
 		nbytes = -2;
 	  }
   }
@@ -2666,7 +2660,6 @@ bgp_read (struct thread *thread)
 	BGP_EVENT_ADD (peer, TCP_fatal_error);
 	return 0;
   }
-  peer->more_data_to_receive = 1;
   int rearm = 0;
 #endif
 
@@ -2708,6 +2701,7 @@ zlog_debug ("%s %d, %p %d",__func__,__LINE__,peer->ibuf,peer->status);
       if (ret < 0)
 	{
 		zlog_err ("bgp_read_packet returned %d, thread type %d",ret, thread->type);
+	//        rearm = 0;
 		goto done;
 	}
 #else
@@ -2784,6 +2778,10 @@ zlog_debug ("%s %d, %p %d",__func__,__LINE__,peer->ibuf,peer->status);
   if (ret < 0) 
     {
 	zlog_err ("%s %d bgp_read_packet returned %d, thread type %d",__func__,__LINE__,ret, thread->type);
+#ifdef HAVE_IPAUGENBLICK
+	zlog_debug("cancel read\n");
+	rearm = 0;
+#endif
         goto done;
     }
 
@@ -2833,7 +2831,10 @@ zlog_debug ("%s %d, %p %d",__func__,__LINE__,peer->ibuf,peer->status);
  done:
 #ifdef HAVE_IPAUGENBLICK
   if((rearm)&&(peer->fd != -1))
+    {
+	zlog_debug("rearm read\n");
 	BGP_READ_ON (peer->t_read, bgp_read, peer->fd);
+    }
 #endif
   if (CHECK_FLAG (peer->sflags, PEER_STATUS_ACCEPT_PEER))
     {

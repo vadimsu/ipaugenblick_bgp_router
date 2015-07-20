@@ -415,8 +415,6 @@ bgp_connect (struct peer *peer)
   /* Make socket for the peer. */
 #ifdef HAVE_IPAUGENBLICK
   zlog (peer->log, LOG_INFO, "open socket selector %d",master->selector);
-  peer->more_data_to_receive = 0;
-  peer->more_data_to_transmit = 0;
   peer->fd = ipaugenblick_open_socket(AF_INET,SOCK_STREAM,master->selector);
   zlog (peer->log, LOG_INFO, "fd %d",peer->fd);
 #else
@@ -616,7 +614,7 @@ bgp_socket (unsigned short port, const char *address)
   ret = 0;
   struct sockaddr_in sin;
   sin.sin_family = AF_INET;
-  sin.sin_addr.s_addr = inet_addr("192.168.150.63");
+  sin.sin_addr.s_addr = inet_addr("192.168.122.176");
   sin.sin_port = 179;
   int sock = ipaugenblick_open_socket(AF_INET,SOCK_STREAM,master->selector);
   bgp_listener (sock, &sin, sizeof(sin));
