@@ -764,6 +764,7 @@ funcname_thread_add_read_pmd (struct thread_master *m,
   thread = thread_get (m, THREAD_READ, func, arg, debugargpass);
   zlog(NULL,LOG_DEBUG, "%s %d fd %d thread %p master %p",__func__,__LINE__,fd,thread,m);
   ipaugenblick_fdset (fd, &m->readfdpmd,0x1);
+  ipaugenblick_fdset (fd, &m->excfdpmd,0x4);
   thread->u.fd = fd;
   thread->pmd = 1;
   thread_list_add (&m->read, thread);
@@ -783,6 +784,7 @@ funcname_thread_add_write_pmd (struct thread_master *m,
   thread = thread_get (m, THREAD_WRITE, func, arg, debugargpass);
   zlog(NULL,LOG_DEBUG, "%s %d fd %d thread %p master %p",__func__,__LINE__,fd,thread,m);
   ipaugenblick_fdset (fd, &m->writefdpmd,0x2);
+  ipaugenblick_fdset (fd, &m->excfdpmd,0x4);
   thread->u.fd = fd;
   thread->pmd = 1;
   thread_list_add (&m->write, thread);
@@ -1088,7 +1090,10 @@ thread_run (struct thread_master *m, struct thread *thread,
 }
 #ifdef HAVE_IPAUGENBLICK
 static int
-thread_process_fd_pmd (struct thread_list *list, struct ipaugenblick_fdset *mfdset, int mask, int is_error)
+thread_process_fd_pmd (struct thread_list *list,
+			struct ipaugenblick_fdset *mfdset, 
+			int mask, 
+			struct ipaugenblick_fdset *merrorfdset)
 {
   struct thread *thread;
   struct thread *next;
@@ -1103,12 +1108,11 @@ thread_process_fd_pmd (struct thread_list *list, struct ipaugenblick_fdset *mfds
       if (!ipaugenblick_fdisset(THREAD_FD(thread), mfdset)) {
 	continue;
       }
-      zlog(NULL,LOG_DEBUG, "%s %d %p %d is_error %d",__func__,__LINE__,thread,THREAD_FD (thread), is_error);
       ipaugenblick_fdclear(THREAD_FD (thread), mfdset,mask);
       thread_list_delete (list, thread);
       thread_list_add (&thread->master->ready, thread);
       thread->type = THREAD_READY;
-      thread->io_error = is_error;
+      thread->io_error = ipaugenblick_fdisset(THREAD_FD(thread), merrorfdset);
       ready++;
     }
   return ready;
@@ -1312,8 +1316,8 @@ thread_fetch (struct thread_master *m, struct thread *fetch)
 	if (ready_sock > 0)
 	  {
 		//printf("%s %d %d\n",__func__,__LINE__,ready_sock);
-		  thread_process_fd_pmd (&m->read, &readfdpmd,0x1,0);
-		  thread_process_fd_pmd (&m->write, &writefdpmd,0x2,0);
+		  thread_process_fd_pmd (&m->read, &readfdpmd,0x1,&excfdpmd);
+		  thread_process_fd_pmd (&m->write, &writefdpmd,0x2,&excfdpmd);
 //		  m->readfdpmd.returned_idx = 0;
 //		  m->writefdpmd.returned_idx = 0;
 	    }
