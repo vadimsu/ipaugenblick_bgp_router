@@ -538,9 +538,9 @@ thread_master_create ()
   rv->timer->cmp = rv->background->cmp = thread_timer_cmp;
   rv->timer->update = rv->background->update = thread_timer_update;
 #ifdef HAVE_IPAUGENBLICK
-  ipaugenblick_fdzero(&rv->readfdpmd,0x1);
-  ipaugenblick_fdzero(&rv->writefdpmd,0x2);
-  ipaugenblick_fdzero(&rv->excfdpmd,0x4);
+  ipaugenblick_fdzero(&rv->readfdpmd);
+  ipaugenblick_fdzero(&rv->writefdpmd);
+  ipaugenblick_fdzero(&rv->excfdpmd);
 #endif
 
   return rv;
@@ -763,8 +763,8 @@ funcname_thread_add_read_pmd (struct thread_master *m,
   assert (m != NULL);
   thread = thread_get (m, THREAD_READ, func, arg, debugargpass);
   zlog(NULL,LOG_DEBUG, "%s %d fd %d thread %p master %p",__func__,__LINE__,fd,thread,m);
-  ipaugenblick_fdset (fd, &m->readfdpmd,0x1);
-  ipaugenblick_fdset (fd, &m->excfdpmd,0x4);
+  ipaugenblick_fdset (fd, &m->readfdpmd);
+  ipaugenblick_fdset (fd, &m->excfdpmd);
   thread->u.fd = fd;
   thread->pmd = 1;
   thread_list_add (&m->read, thread);
@@ -783,8 +783,8 @@ funcname_thread_add_write_pmd (struct thread_master *m,
 
   thread = thread_get (m, THREAD_WRITE, func, arg, debugargpass);
   zlog(NULL,LOG_DEBUG, "%s %d fd %d thread %p master %p",__func__,__LINE__,fd,thread,m);
-  ipaugenblick_fdset (fd, &m->writefdpmd,0x2);
-  ipaugenblick_fdset (fd, &m->excfdpmd,0x4);
+  ipaugenblick_fdset (fd, &m->writefdpmd);
+  ipaugenblick_fdset (fd, &m->excfdpmd);
   thread->u.fd = fd;
   thread->pmd = 1;
   thread_list_add (&m->write, thread);
@@ -914,11 +914,11 @@ zlog(NULL,LOG_DEBUG, "%s %d type %d thread %p fd %d master %p %d",__func__,__LIN
   switch (thread->type)
     {
     case THREAD_READ:
-      ipaugenblick_fdclear (thread->u.fd, &thread->master->readfdpmd,0x1);
+      ipaugenblick_fdclear (thread->u.fd, &thread->master->readfdpmd);
       list = &thread->master->read;
       break;
     case THREAD_WRITE:
-      ipaugenblick_fdclear  (thread->u.fd, &thread->master->writefdpmd,0x2);
+      ipaugenblick_fdclear  (thread->u.fd, &thread->master->writefdpmd);
       list = &thread->master->write;
       break;
     case THREAD_TIMER:
@@ -1091,8 +1091,7 @@ thread_run (struct thread_master *m, struct thread *thread,
 #ifdef HAVE_IPAUGENBLICK
 static int
 thread_process_fd_pmd (struct thread_list *list,
-			struct ipaugenblick_fdset *mfdset, 
-			int mask, 
+			struct ipaugenblick_fdset *mfdset,  
 			struct ipaugenblick_fdset *merrorfdset)
 {
   struct thread *thread;
@@ -1104,11 +1103,13 @@ thread_process_fd_pmd (struct thread_list *list,
   for (thread = list->head; thread; thread = next)
     {
       next = thread->next;
-
+      if (!thread->pmd) {
+	continue;
+      }
       if (!ipaugenblick_fdisset(THREAD_FD(thread), mfdset)) {
 	continue;
       }
-      ipaugenblick_fdclear(THREAD_FD (thread), mfdset,mask);
+      ipaugenblick_fdclear(THREAD_FD (thread), mfdset);
       thread_list_delete (list, thread);
       thread_list_add (&thread->master->ready, thread);
       thread->type = THREAD_READY;
@@ -1275,7 +1276,6 @@ thread_fetch (struct thread_master *m, struct thread *fetch)
       struct ipaugenblick_fdset readfdpmd = m->readfdpmd;
       struct ipaugenblick_fdset writefdpmd = m->writefdpmd;
       struct ipaugenblick_fdset excfdpmd = m->excfdpmd;
-      //zlog(NULL,LOG_DEBUG, "%s %d %d",__func__,__LINE__,THREAD_FD(m));
       int ready_sock = ipaugenblick_select(m->selector,&readfdpmd,&writefdpmd,&excfdpmd,timer_wait); 
       struct timeval null_timer_val = { .tv_sec = 0, .tv_usec = 0 }; 
       num = select (FD_SETSIZE, &readfd, &writefd, &exceptfd, &null_timer_val);
@@ -1316,8 +1316,8 @@ thread_fetch (struct thread_master *m, struct thread *fetch)
 	if (ready_sock > 0)
 	  {
 		//printf("%s %d %d\n",__func__,__LINE__,ready_sock);
-		  thread_process_fd_pmd (&m->read, &readfdpmd,0x1,&excfdpmd);
-		  thread_process_fd_pmd (&m->write, &writefdpmd,0x2,&excfdpmd);
+		  thread_process_fd_pmd (&m->read, &readfdpmd, &excfdpmd);
+		  thread_process_fd_pmd (&m->write, &writefdpmd, &excfdpmd);
 //		  m->readfdpmd.returned_idx = 0;
 //		  m->writefdpmd.returned_idx = 0;
 	    }

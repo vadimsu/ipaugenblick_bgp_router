@@ -206,6 +206,7 @@ bgp_accept (struct thread *thread)
   struct peer *peer;
   struct peer *peer1;
   char buf[SU_ADDRSTRLEN];
+  int addrlen = sizeof(su.sin);
 
   /* Register accept thread. */
   accept_sock = THREAD_FD (thread);
@@ -222,8 +223,8 @@ bgp_accept (struct thread *thread)
 
   /* Accept client connection. */
 #ifdef HAVE_IPAUGENBLICK
-  zlog_debug ("accepting");
-  bgp_sock = ipaugenblick_accept(accept_sock,&su.sin.sin_addr.s_addr,&su.sin.sin_port);
+  zlog_debug ("accepting on socket %d", accept_sock);
+  bgp_sock = ipaugenblick_accept(accept_sock,&su.sa, &addrlen);
   if(bgp_sock < 0)
     {
         zlog_err ("[Error] BGP socket accept failed (%s)", safe_strerror (errno));
@@ -240,6 +241,7 @@ bgp_accept (struct thread *thread)
     }
   set_nonblocking (bgp_sock);
 #endif
+zlog_debug ("accepted socket %d", bgp_sock);
   /* Set socket send buffer size */
   bgp_update_sock_send_buffer_size(bgp_sock);
 
@@ -379,7 +381,7 @@ bgp_update_source (struct peer *peer)
 	return;
 #ifdef HAVE_IPAUGENBLICK
       zlog (peer->log, LOG_INFO, "bind to %x %x",addr.sin.sin_addr.s_addr,addr.sin.sin_port);
-      ipaugenblick_v4_connect_bind_socket(peer->fd,addr.sin.sin_addr.s_addr,addr.sin.sin_port,0);
+      ipaugenblick_bind(peer->fd, &addr.sa, sizeof(addr.sin));
 #else
       sockunion_bind (peer->fd, &addr, 0, &addr);
 #endif
@@ -399,7 +401,7 @@ bgp_update_source (struct peer *peer)
     peer->su_local->sin.sin_addr.s_addr = peer->update_source->sin.sin_addr.s_addr;
     peer->su_local->sin.sin_port = peer->update_source->sin.sin_port;
     zlog (peer->log, LOG_INFO, "bind to %x %x",peer->update_source->sin.sin_addr.s_addr,peer->update_source->sin.sin_port);
-    ipaugenblick_v4_connect_bind_socket(peer->fd,peer->update_source->sin.sin_addr.s_addr,peer->update_source->sin.sin_port,0);
+    ipaugenblick_bind(peer->fd, &peer->update_source->sa, sizeof(peer->update_source->sin));
   }
 #else
     sockunion_bind (peer->fd, peer->update_source, 0, peer->update_source);
@@ -479,7 +481,7 @@ bgp_connect (struct peer *peer)
   peer->su_remote->sin.sin_addr.s_addr = peer->su.sin.sin_addr.s_addr;
   peer->su_remote->sin.sin_port = peer->su.sin.sin_port;
   zlog (peer->log, LOG_INFO, "connect to %x %x",peer->su.sin.sin_addr.s_addr,htons(peer->port));
-  return (ipaugenblick_v4_connect_bind_socket(peer->fd,peer->su.sin.sin_addr.s_addr,htons(peer->port),1) == 0) ? connect_in_progress : connect_error;
+  return (ipaugenblick_connect(peer->fd, &peer->su.sa, sizeof(peer->su.sin)) == 0) ? connect_in_progress : connect_error;
 #else
   return sockunion_connect (peer->fd, &peer->su, htons (peer->port), ifindex);
 #endif
@@ -490,6 +492,7 @@ void
 bgp_getsockname (struct peer *peer)
 {
 #ifdef HAVE_IPAUGENBLICK
+  int addrlen;
   if (peer->su_local)
     {
       sockunion_free (peer->su_local);
@@ -505,8 +508,10 @@ bgp_getsockname (struct peer *peer)
   peer->su_remote = XCALLOC (MTYPE_SOCKUNION, sizeof (union sockunion));
   peer->su_local->sa.sa_family = AF_INET;// temporary. need to find better solution
   peer->su_remote->sa.sa_family = AF_INET;
-  ipaugenblick_getsockname(peer->fd,1,&peer->su_local->sin.sin_addr.s_addr,&peer->su_local->sin.sin_port);/* local */
-  ipaugenblick_getsockname(peer->fd,0,&peer->su_remote->sin.sin_addr.s_addr,&peer->su_remote->sin.sin_port);
+  addrlen = sizeof(peer->su_local->sa);
+  ipaugenblick_getsockname(peer->fd,1,&peer->su_local->sa,&addrlen);/* local */
+  addrlen = sizeof(peer->su_remote->sa);
+  ipaugenblick_getsockname(peer->fd,0,&peer->su_remote->sa,&addrlen);
 zlog (peer->log, LOG_INFO, "ADDRESSES remote %x local %x fd %d",peer->su_remote->sin.sin_addr.s_addr,peer->su_local->sin.sin_addr.s_addr,peer->fd);
 #else
   if (peer->su_local)
@@ -544,8 +549,8 @@ bgp_listener (int sock, struct sockaddr *sa, socklen_t salen)
   if (bgpd_privs.change (ZPRIVS_RAISE))
     zlog_err ("%s: could not raise privs", __func__);
 #ifdef HAVE_IPAUGENBLICK 
-   zlog_debug("listener: bind to %x %x",((struct sockaddr_in *)sa)->sin_addr.s_addr,((struct sockaddr_in *)sa)->sin_port);
-   ipaugenblick_v4_connect_bind_socket(sock,((struct sockaddr_in *)sa)->sin_addr.s_addr,((struct sockaddr_in *)sa)->sin_port,0);
+   zlog_debug("listener: bind to %x %x socket %d",((struct sockaddr_in *)sa)->sin_addr.s_addr,((struct sockaddr_in *)sa)->sin_port, sock);
+   ipaugenblick_bind(sock,sa,sizeof(struct sockaddr_in));
 #else
 #ifdef IPTOS_PREC_INTERNETCONTROL
   if (sa->sa_family == AF_INET)

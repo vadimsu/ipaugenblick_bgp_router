@@ -921,6 +921,7 @@ bgp_write_notify (struct peer *peer)
 				BGP_WRITE_ON (peer->t_write, bgp_write, peer->fd);
 			zlog (peer->log, LOG_INFO, "kicking socket");
 			ipaugenblick_socket_kick(peer->fd);
+			ret = writenum - remained;
 	      }
 	}
 #else
@@ -2524,7 +2525,7 @@ zlog (peer->log, LOG_INFO, "bgp_read_packet to read %d",readsize);
   /* Read packet from fd. */
 #ifdef HAVE_IPAUGENBLICK
   {
-	int len = readsize,bufidx;
+	int len = readsize;
 	void *rxbuff,*pdesc;
 	int buflen = 0;
 	zlog (peer->log, LOG_INFO, "receiving %d bytes",readsize);
@@ -2535,7 +2536,7 @@ zlog (peer->log, LOG_INFO, "bgp_read_packet to read %d",readsize);
 		zlog (peer->log, LOG_INFO, "suceeded");
 		while(rxbuff)
 	  	{
-		    zlog (peer->log, LOG_INFO, "buffer#%d is %p len %d",bufidx,rxbuff,buflen);
+		    zlog (peer->log, LOG_INFO, "%p len %d",rxbuff,buflen);
                     if(buflen > 0) /* API must be changed to return first segment's length!!! */
 		      {	
                         memcpy((void *)(peer->ibuf->data + peer->ibuf->endp),rxbuff,buflen);
