@@ -588,7 +588,13 @@ bgp_address_init (void)
   bgp_address_hash = hash_create (bgp_address_hash_key_make,
                                   bgp_address_hash_cmp);
 }
-
+#ifdef HAVE_IPAUGENBLICK
+static struct prefix *prefix_to_bind = NULL;
+struct prefix *bgp_get_prefix_to_bind()
+{
+	return prefix_to_bind;
+}
+#endif
 static void
 bgp_address_add (struct prefix *p)
 {
@@ -599,6 +605,12 @@ bgp_address_add (struct prefix *p)
 
   addr = hash_get (bgp_address_hash, &tmp, bgp_address_hash_alloc);
   addr->refcnt++;
+#ifdef HAVE_IPAUGENBLICK
+  if (prefix_to_bind == NULL) {
+	prefix_to_bind = malloc(sizeof(struct prefix));
+	memcpy(prefix_to_bind,p,sizeof(*p));
+  }
+#endif
 }
 
 static void
@@ -606,6 +618,11 @@ bgp_address_del (struct prefix *p)
 {
   struct bgp_addr tmp;
   struct bgp_addr *addr;
+#ifdef HAVE_IPAUGENBLICK
+  if (prefix_to_bind == p) /* Ugly, to rewrite */
+	prefix_to_bind = NULL;
+#endif
+
 
   tmp.addr = p->u.prefix4;
 

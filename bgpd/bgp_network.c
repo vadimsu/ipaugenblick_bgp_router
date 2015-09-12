@@ -37,6 +37,7 @@ Software Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
 #include "bgpd/bgp_attr.h"
 #include "bgpd/bgp_debug.h"
 #include "bgpd/bgp_network.h"
+#include "bgpd/bgp_nexthop.h"
 #ifdef HAVE_IPAUGENBLICK
 #include <ipaugenblick_api.h>
 #endif
@@ -619,7 +620,14 @@ bgp_socket (unsigned short port, const char *address)
   ret = 0;
   struct sockaddr_in sin;
   sin.sin_family = AF_INET;
-  sin.sin_addr.s_addr = inet_addr("192.168.122.176");
+  if (address == NULL) {
+	struct prefix *prfx = bgp_get_prefix_to_bind();
+
+	if (prfx) {
+		sin.sin_addr.s_addr = prfx->u.prefix4.s_addr;
+	}
+  } else
+  	sin.sin_addr.s_addr = inet_addr(address);
   sin.sin_port = 179;
   int sock = ipaugenblick_open_socket(AF_INET,SOCK_STREAM,master->selector);
   bgp_listener (sock, &sin, sizeof(sin));

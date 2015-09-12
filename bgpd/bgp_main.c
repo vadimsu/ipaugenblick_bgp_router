@@ -71,6 +71,7 @@ static const struct option longopts[] =
   { "version",     no_argument,       NULL, 'v'},
   { "dryrun",      no_argument,       NULL, 'C'},
   { "help",        no_argument,       NULL, 'h'},
+  { "proc-type",   required_argument, NULL, 's'},
   { 0 }
 };
 
@@ -162,7 +163,8 @@ redistribution between different routing protocols.\n\n\
 -A, --vty_addr     Set vty's bind address\n\
 -P, --vty_port     Set vty's port number\n\
 -r, --retain       When program terminates, retain added route by bgpd.\n\
--n, --no_kernel    Do not install route to kernel.\n\
+-n		   <number of memory channels>\n\
+-c		   <core mask> to run on\n\
 -u, --user         User to run as\n\
 -g, --group        Group to run as\n\
 -v, --version      Print program version\n\
@@ -339,23 +341,23 @@ main (int argc, char **argv)
 
   zlog_default = openzlog (progname, ZLOG_BGP,
 			   LOG_CONS|LOG_NDELAY|LOG_PID, LOG_DAEMON);
-
-  char *eal_args[] = { "bgpd","-c", "c", "-n", "1", "--proc-type", "secondary" };
-#ifdef HAVE_IPAUGENBLICK
-  if(ipaugenblick_app_init(7,eal_args,"quagga_bgpd") != 0) 
+#ifdef HAVE_IPAUGENBLICK 
+  if(ipaugenblick_app_init(argc,argv,"quagga_bgpd") != 0) 
     {
         printf("cannot initialize IPAugenblick\n");
         return 1;
     }
+//    ipaugenblick_log_init(1);
+    ipaugenblick_set_log_level(0);
     ipaugenblick_create_client(bgp_ipaugenblick_on_updates_cbk);
-#endif
+ #endif
   /* BGP master init. */
   bgp_master_init ();
 
   /* Command line argument treatment. */
   while (1) 
     {
-      opt = getopt_long (argc, argv, "df:i:z:hp:l:A:P:rnu:g:vC", longopts, 0);
+      opt = getopt_long (argc, argv, "df:i:z:hp:l:A:P:rnu:g:vCc:s:", longopts, 0);
     
       if (opt == EOF)
 	break;
@@ -405,7 +407,9 @@ main (int argc, char **argv)
 	  bm->address = optarg;
 	  /* listenon implies -n */
 	case 'n':
-	  bgp_option_set (BGP_OPT_NO_FIB);
+	case 'c':
+	case 's':
+	/* EAL mandatory options */
 	  break;
 	case 'u':
 	  bgpd_privs.user = optarg;
@@ -424,10 +428,7 @@ main (int argc, char **argv)
 	  usage (progname, 0);
 	  break;
 	default:
-#ifdef HAVE_IPAUGENBLICK
-#else
 	  usage (progname, 1);
-#endif
 	  break;
 	}
     }
@@ -449,7 +450,9 @@ main (int argc, char **argv)
 
   /* BGP related initialization.  */
   bgp_init ();
-
+#ifdef HAVE_IPAUGENBLICK
+  while(ipaugenblick_read_updates() != 0);
+#endif
   /* Parse config file. */
   vty_read_config (config_file, config_default);
 
@@ -476,9 +479,6 @@ main (int argc, char **argv)
 	       vty_port, 
 	       (bm->address ? bm->address : "<all>"),
 	       bm->port);
-#ifdef HAVE_IPAUGENBLICK
-   while(ipaugenblick_read_updates() != 0);
-#endif
   /* Start finite state machine, here we go! */
   while (thread_fetch (master, &thread))
     thread_call (&thread);
