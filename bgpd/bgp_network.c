@@ -480,9 +480,9 @@ bgp_connect (struct peer *peer)
     }
   peer->su_remote = XCALLOC (MTYPE_SOCKUNION, sizeof (union sockunion));
   peer->su_remote->sin.sin_addr.s_addr = peer->su.sin.sin_addr.s_addr;
-  peer->su_remote->sin.sin_port = peer->su.sin.sin_port;
-  zlog (peer->log, LOG_INFO, "connect to %x %x",peer->su.sin.sin_addr.s_addr,htons(peer->port));
-  return (ipaugenblick_connect(peer->fd, &peer->su.sa, sizeof(peer->su.sin)) == 0) ? connect_in_progress : connect_error;
+  peer->su_remote->sin.sin_port = peer->su.sin.sin_port = htons(peer->port);
+  zlog (peer->log, LOG_INFO, "connect to %x %x %x",peer->su.sin.sin_addr.s_addr,htons(peer->port),peer->su.sin.sin_port);
+  return (ipaugenblick_connect(peer->fd, &peer->su.sin, sizeof(peer->su.sin)) == 0) ? connect_in_progress : connect_error;
 #else
   return sockunion_connect (peer->fd, &peer->su, htons (peer->port), ifindex);
 #endif
