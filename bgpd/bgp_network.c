@@ -713,7 +713,7 @@ bgp_socket (unsigned short port, const char *address)
 #endif
   memset (&sin, 0, sizeof (struct sockaddr_in));
   sin.sin_family = AF_INET;
-  sin.sin_port = htons (port);
+  sin.sin_port = port;
   socklen = sizeof (struct sockaddr_in);
 
   if (address && ((ret = inet_aton(address, &sin.sin_addr)) < 1))
