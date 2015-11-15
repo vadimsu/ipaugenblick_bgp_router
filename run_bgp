@@ -1,0 +1,1 @@
+sudo ./bgpd/bgpd -c 2 -n 1 --proc-type secondary -- -u root
