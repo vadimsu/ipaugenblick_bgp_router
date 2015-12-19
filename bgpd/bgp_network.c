@@ -293,7 +293,7 @@ zlog_debug ("accepted socket %d", bgp_sock);
     sockunion2str (&su, buf, SU_ADDRSTRLEN);
     peer->host = XSTRDUP (MTYPE_BGP_PEER_HOST, buf);
   }
-
+zlog_debug("Triggering TCP_connection_open after accepted");
   BGP_EVENT_ADD (peer, TCP_connection_open);
 
   return 0;
@@ -400,7 +400,7 @@ bgp_update_source (struct peer *peer)
     }
     peer->su_local = XCALLOC (MTYPE_SOCKUNION, sizeof (union sockunion));
     peer->su_local->sin.sin_addr.s_addr = peer->update_source->sin.sin_addr.s_addr;
-    peer->su_local->sin.sin_port = peer->update_source->sin.sin_port;
+    peer->su_local->sin.sin_port = htons(peer->update_source->sin.sin_port);
     zlog (peer->log, LOG_INFO, "bind to %x %x",peer->update_source->sin.sin_addr.s_addr,peer->update_source->sin.sin_port);
     ipaugenblick_bind(peer->fd, &peer->update_source->sa, sizeof(peer->update_source->sin));
   }
@@ -628,10 +628,10 @@ bgp_socket (unsigned short port, const char *address)
 	}
   } else
   	sin.sin_addr.s_addr = inet_addr(address);
-  sin.sin_port = 179;
-  int sock = ipaugenblick_open_socket(AF_INET,SOCK_STREAM,master->selector);
-  bgp_listener (sock, &sin, sizeof(sin));
-  return 0;
+	sin.sin_port = htons(179);
+	int sock = ipaugenblick_open_socket(AF_INET,SOCK_STREAM,master->selector);
+	bgp_listener (sock, &sin, sizeof(sin));
+	return 0;
 #else
   ret = getaddrinfo (address, port_str, &req, &ainfo_save);
 #endif
@@ -713,7 +713,7 @@ bgp_socket (unsigned short port, const char *address)
 #endif
   memset (&sin, 0, sizeof (struct sockaddr_in));
   sin.sin_family = AF_INET;
-  sin.sin_port = port;
+  sin.sin_port = htons(port);
   socklen = sizeof (struct sockaddr_in);
 
   if (address && ((ret = inet_aton(address, &sin.sin_addr)) < 1))

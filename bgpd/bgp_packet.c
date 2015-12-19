@@ -139,6 +139,7 @@ bgp_connect_check (struct peer *peer)
   /* When status is 0 then TCP connection is established. */
   if (status == 0)
     {
+zlog_debug("Triggering TCP_connection_open after connected");
       BGP_EVENT_ADD (peer, TCP_connection_open);
     }
   else
@@ -850,8 +851,16 @@ zlog_debug ("%s %d %p %d",__func__,__LINE__, thread,peer->fd);
   while (++count < BGP_WRITE_PACKET_MAX &&
 	 (s = bgp_write_packet (peer)) != NULL);
   
-  if (bgp_write_proceed (peer))
+  if (bgp_write_proceed (peer)) {
     BGP_WRITE_ON (peer->t_write, bgp_write, peer->fd);
+  } else {
+#ifdef HAVE_IPAUGENBLICK
+	if (s == NULL) {
+		zlog_debug("shutting write thread off");
+		ipaugenblick_fdclear  (thread->u.fd, &thread->master->writefdpmd);
+	}
+#endif
+  }
 
  done:
 #ifdef HAVE_IPAUGENBLICK
@@ -1049,7 +1058,7 @@ bgp_open_send (struct peer *peer)
 
   /* Add packet to the peer. */
   bgp_packet_add (peer, s);
-
+zlog_debug("Waiting for socket writable to send Open");
   BGP_WRITE_ON (peer->t_write, bgp_write, peer->fd);
 }
 
